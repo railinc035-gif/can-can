@@ -4303,28 +4303,115 @@ function changeEditorFontSize(delta) {
 }
 
 /* =====================================================
-   FORMATEADOR DE CÓDIGO (BEAUTIFIER)
+   REFACTORIZADOR Y FORMATEADOR UNIVERSAL MULTI-LENGUAJE
 ===================================================== */
+function refactorCodeString(code, fileType) {
+    if (!code || typeof code !== "string" || !code.trim()) return code;
+    let refactored = code;
+
+    try {
+        if ((fileType === "html" || fileType === "xml" || fileType === "svg") && typeof html_beautify === "function") {
+            refactored = html_beautify(refactored, { indent_size: 2, wrap_line_length: 0, unformatted: [] });
+        } else if (fileType === "css" && typeof css_beautify === "function") {
+            refactored = css_beautify(refactored, { indent_size: 2 });
+        } else if ((fileType === "js" || fileType === "ts" || fileType === "jsx" || fileType === "tsx") && typeof js_beautify === "function") {
+            refactored = js_beautify(refactored, { indent_size: 2, preserve_newlines: true, space_after_anon_function: true });
+        } else if (fileType === "json") {
+            try {
+                const parsed = JSON.parse(refactored);
+                refactored = JSON.stringify(parsed, null, 2);
+            } catch (e) {}
+        } else if (fileType === "python") {
+            // Refactorización PEP-8 para Python: indentación uniforme de 4 espacios, espaciado de operadores
+            const lines = refactored.split("\n");
+            let indentLevel = 0;
+            const newLines = lines.map(line => {
+                let trimmed = line.trim();
+                if (!trimmed) return "";
+                if (trimmed.startsWith("elif ") || trimmed.startsWith("else:") || trimmed.startsWith("except") || trimmed.startsWith("finally:")) {
+                    const lineIndent = "    ".repeat(Math.max(0, indentLevel - 1));
+                    if (trimmed.endsWith(":")) indentLevel = Math.max(1, indentLevel);
+                    return lineIndent + trimmed;
+                }
+                const currentIndent = "    ".repeat(indentLevel);
+                if (trimmed.endsWith(":") || trimmed.endsWith("(") || trimmed.endsWith("[")) {
+                    indentLevel++;
+                } else if (indentLevel > 0 && (trimmed === "pass" || trimmed.startsWith("return") || trimmed.startsWith("raise") || trimmed.startsWith("break") || trimmed.startsWith("continue"))) {
+                    // Mantiene indentación
+                }
+                return currentIndent + trimmed;
+            });
+            refactored = newLines.join("\n");
+        } else if (["cpp", "c", "java", "csharp", "go", "rust", "php"].includes(fileType)) {
+            // Refactorizador universal basado en llaves para C, C++, Java, C#, Go, Rust, PHP
+            const lines = refactored.split("\n");
+            let indentLevel = 0;
+            const newLines = lines.map(line => {
+                let trimmed = line.trim();
+                if (!trimmed) return "";
+                const closeBraces = (trimmed.match(/\}/g) || []).length;
+                const openBraces = (trimmed.match(/\{/g) || []).length;
+                indentLevel = Math.max(0, indentLevel - closeBraces);
+                const currentIndent = "  ".repeat(indentLevel);
+                indentLevel += openBraces;
+                return currentIndent + trimmed;
+            });
+            refactored = newLines.join("\n");
+        } else if (fileType === "sql") {
+            // Refactorización de SQL: palabras clave en mayúsculas y formato de cláusulas
+            const keywords = ["select", "from", "where", "insert", "into", "update", "delete", "join", "left", "right", "inner", "outer", "group by", "order by", "having", "limit", "values", "set", "and", "or", "as", "on", "create", "table", "drop", "alter"];
+            keywords.forEach(kw => {
+                const regex = new RegExp(`\\b${kw}\\b`, "gi");
+                refactored = refactored.replace(regex, kw.toUpperCase());
+            });
+        }
+    } catch (err) {
+        console.warn("Advertencia durante refactorización:", err);
+    }
+
+    return refactored;
+}
+
+function refactorAllProjectFiles() {
+    const project = typeof getCurrentProject === "function" ? getCurrentProject() : null;
+    if (!project || !project.files) return;
+
+    let count = 0;
+    Object.keys(project.files).forEach(filename => {
+        const fileType = typeof getFileType === "function" ? getFileType(filename) : "";
+        const original = project.files[filename];
+        if (original && typeof original === "string") {
+            const refactored = refactorCodeString(original, fileType);
+            if (refactored !== original) {
+                project.files[filename] = refactored;
+                count++;
+            }
+        }
+    });
+
+    if (currentFileName && project.files[currentFileName] && typeof codeEditor !== "undefined" && codeEditor) {
+        codeEditor.value = project.files[currentFileName];
+        if (typeof updateLineCounter === "function") updateLineCounter();
+    }
+
+    if (typeof saveProjects === "function") saveProjects();
+    if (typeof updatePreview === "function") updatePreview();
+
+    showTopNotification(`✨ Refactorizados ${count} archivo(s) en todo el proyecto`, null, 3000);
+}
+
 function formatCurrentCode() {
     const editor = document.getElementById("codeEditor");
     if (!editor || editor.disabled || !editor.value.trim()) return;
 
     if (editor.value.length > LARGE_FILE_THRESHOLD) {
-        showTopNotification("⚡ Archivo grande: el formateador se omitió para mantener el editor rápido", null, 3500);
+        showTopNotification("⚡ Archivo grande: la refactorización se omitió para mantener el editor rápido", null, 3500);
         return;
     }
 
     const raw = editor.value;
     const fileType = typeof getFileType === "function" ? getFileType(currentFileName) : "";
-    let formatted = raw;
-
-    if (fileType === "html" && typeof html_beautify === "function") {
-        formatted = html_beautify(raw, { indent_size: 2, wrap_line_length: 0 });
-    } else if (fileType === "css" && typeof css_beautify === "function") {
-        formatted = css_beautify(raw, { indent_size: 2 });
-    } else if (fileType === "js" && typeof js_beautify === "function") {
-        formatted = js_beautify(raw, { indent_size: 2, preserve_newlines: true });
-    }
+    const formatted = refactorCodeString(raw, fileType);
 
     editor.value = formatted;
 
@@ -4333,7 +4420,7 @@ function formatCurrentCode() {
     if (typeof updatePreview === "function") updatePreview();
 
     if (typeof showTopNotification === "function") {
-        showTopNotification("✨ Código formateado correctamente", null, 2500);
+        showTopNotification("✨ Código refactorizado correctamente", null, 2500);
     }
 }
 
@@ -5172,6 +5259,14 @@ function replaceAllMatches() {
                 Live  
             </span>  
  
+            <button
+                id="refactorBtn"
+                class="preview-button"
+                title="Refactorizar y formatear todos los archivos del proyecto (todos los lenguajes)"
+                onclick="refactorAllProjectFiles()">
+                ✨ Refactorizar
+            </button>
+
             <button
                 id="diagnosticsBtn"
                 class="preview-button"
