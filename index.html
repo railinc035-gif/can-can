@@ -3727,9 +3727,23 @@ builtins.input = custom_input
             stack: e.reason && e.reason.stack ? String(e.reason.stack) : ""
         }, '*');
     });
+
+    // Adaptador de la aplicación/web según la vista activa (Laptop / Teléfono)
+    window.addEventListener('message', function(e) {
+        if (e.data && e.data.type === 'viewport-resized') {
+            var isMobile = window.innerWidth <= 420;
+            document.body.classList.toggle('app-view-mobile', isMobile);
+            document.body.classList.toggle('app-view-laptop', !isMobile);
+            window.dispatchEvent(new Event('resize'));
+        }
+    });
 })();
 <\/script>
 `;
+
+    if (!html.includes('<meta name="viewport"')) {
+        html = '<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">\n' + html;
+    }
 
     if(html.includes("<head>")){ 
         html = html.replace("<head>", "<head>" + runtimeErrorInterceptorScript + visualEditorScript);
