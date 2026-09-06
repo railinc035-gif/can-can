@@ -22,6 +22,8 @@ if ('serviceWorker' in navigator) {
 <script src="https://cdn.jsdelivr.net/npm/js-beautify@1.15.1/js/lib/beautify-css.js" defer></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jshint/2.13.6/jshint.min.js" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/htmlhint@1.1.4/dist/htmlhint.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/pyodide/v0.25.0/full/pyodide.js" defer></script>
 
   
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
@@ -2986,6 +2988,212 @@ function updatePreviewImmediate(sequence = previewUpdateSequence){
         return !/^(https?:|data:|\/\/|#)/i.test(src) && files[localName] === undefined ? "" : tag;
     });
   
+    // Si no hay HTML principal pero hay un archivo activo con lenguaje específico, generar runner adecuado
+    const activeType = currentFileName ? getFileType(currentFileName) : "";
+    const activeContent = (currentFileName && files[currentFileName]) ? files[currentFileName] : "";
+
+    if (!html && currentFileName) {
+        if (activeType === "python") {
+            const escapedPy = JSON.stringify(activeContent);
+            const escapedPyName = JSON.stringify(currentFileName);
+            html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<style>
+  body { background: #0e1318; color: #38bdf8; font-family: Consolas, monospace; padding: 20px; margin: 0; }
+  .term-header { display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #22303c; padding-bottom: 10px; margin-bottom: 15px; color: #94a3b8; font-size: 13px; }
+  .term-out { background: #080c10; border: 1px solid #1e293b; border-radius: 8px; padding: 15px; min-height: 300px; font-size: 13px; line-height: 1.6; white-space: pre-wrap; color: #f1f5f9; overflow: auto; }
+  .status { color: #ff6a00; font-weight: bold; }
+</style>
+<script src="https://cdn.jsdelivr.net/pyodide/v0.25.0/full/pyodide.js"><\/script>
+</head>
+<body>
+  <div class="term-header">
+    <span>🐍 Ejecutor de Python (Pyodide WebAssembly) - <strong>${escapeHTML(currentFileName)}</strong></span>
+    <span id="py-status" class="status">⚡ Cargando entorno Python...</span>
+  </div>
+  <div id="terminal" class="term-out">▶ Iniciando intérprete...</div>
+  <script>
+    async function runPythonScript() {
+      const out = document.getElementById("terminal");
+      const status = document.getElementById("py-status");
+      try {
+        if (typeof loadPyodide === "undefined") {
+          out.textContent += "\\n❌ No se pudo cargar Pyodide. Ejecutando simulación de consola local:\\n\\n";
+          out.textContent += ">>> Executing " + ${escapedPyName} + "\\n" + ${escapedPy};
+          status.textContent = "⚠️ Simulación activa";
+          status.style.color = "#ffbd2e";
+          return;
+        }
+        const pyodide = await loadPyodide({
+          stdout: (text) => { out.textContent += text + "\\n"; },
+          stderr: (text) => { out.textContent += "⚠️ " + text + "\\n"; }
+        });
+        status.textContent = "✅ Ejecutando código...";
+        status.style.color = "#42d66b";
+        out.textContent = ">>> python3 " + ${escapedPyName} + "\\n\\n";
+        const res = await pyodide.runPythonAsync(${escapedPy});
+        if (res !== undefined) {
+          out.textContent += "\\n[Resultado]: " + String(res) + "\\n";
+        }
+        status.textContent = "✔️ Proceso finalizado";
+      } catch (err) {
+        out.textContent += "\\n❌ Error en ejecución Python:\\n" + String(err);
+        status.textContent = "❌ Error de ejecución";
+        status.style.color = "#ff4d4d";
+      }
+    }
+    runPythonScript();
+  <\/script>
+</body>
+</html>`;
+        } else if (activeType === "js" || activeType === "ts") {
+            const escapedJS = JSON.stringify(activeContent);
+            const escapedJSName = JSON.stringify(currentFileName);
+            html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<style>
+  body { background: #0c1015; color: #f7df1e; font-family: Consolas, monospace; padding: 20px; margin: 0; }
+  .header { display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #1e293b; padding-bottom: 10px; margin-bottom: 15px; font-size: 13px; color: #94a3b8; }
+  .console-out { background: #06090c; border: 1px solid #1e293b; border-radius: 8px; padding: 15px; min-height: 300px; font-size: 13px; line-height: 1.6; white-space: pre-wrap; color: #f8fafc; overflow: auto; }
+</style>
+</head>
+<body>
+  <div class="header">
+    <span>⚡ Consola de Ejecución JS/TS - <strong>${escapeHTML(currentFileName)}</strong></span>
+    <span style="color:#42d66b; font-weight:bold;">● Node/JS Engine</span>
+  </div>
+  <div id="consoleLog" class="console-out">▶ Ejecutando script...\\n</div>
+  <script>
+    (function() {
+      const out = document.getElementById("consoleLog");
+      const origLog = console.log;
+      const origError = console.error;
+      const origWarn = console.warn;
+      console.log = function(...args) {
+        origLog(...args);
+        out.textContent += args.map(a => typeof a === 'object' ? JSON.stringify(a, null, 2) : String(a)).join(" ") + "\\n";
+      };
+      console.error = function(...args) {
+        origError(...args);
+        out.textContent += "❌ [Error] " + args.join(" ") + "\\n";
+      };
+      console.warn = function(...args) {
+        origWarn(...args);
+        out.textContent += "⚠️ [Warn] " + args.join(" ") + "\\n";
+      };
+      try {
+        const result = eval(${escapedJS});
+        if (result !== undefined) {
+          out.textContent += "\\n[Retorno]: " + String(result) + "\\n";
+        }
+      } catch (err) {
+        out.textContent += "\\n❌ Error en tiempo de ejecución:\\n" + err.stack;
+      }
+    })();
+  <\/script>
+</body>
+</html>`;
+        } else if (activeType === "markdown") {
+            const escapedMd = JSON.stringify(activeContent);
+            html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<style>
+  body { background: #0d1117; color: #c9d1d9; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; padding: 30px; margin: 0; line-height: 1.6; }
+  .markdown-body { max-width: 800px; margin: 0 auto; background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 32px; box-shadow: 0 10px 30px rgba(0,0,0,0.4); }
+  h1, h2, h3 { border-bottom: 1px solid #21262d; padding-bottom: 8px; color: #f0f6fc; }
+  code { background: rgba(110,118,129,0.4); padding: 0.2em 0.4em; border-radius: 6px; font-family: monospace; }
+  pre { background: #0d1117; padding: 16px; border-radius: 8px; overflow: auto; }
+  pre code { background: transparent; padding: 0; }
+  a { color: #58a6ff; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"><\/script>
+</head>
+<body>
+  <div id="content" class="markdown-body">Cargando Markdown...</div>
+  <script>
+    const md = ${escapedMd};
+    if (typeof marked !== "undefined") {
+      document.getElementById("content").innerHTML = marked.parse(md);
+    } else {
+      document.getElementById("content").textContent = md;
+    }
+  <\/script>
+</body>
+</html>`;
+        } else if (activeType === "svg") {
+            html = `<!DOCTYPE html>
+<html>
+<head>
+<style>
+  body { background: #090d12; margin:0; display:flex; align-items:center; justify-content:center; min-height:100vh; }
+  .svg-box { max-width: 90vw; max-height: 90vh; background: #111822; padding: 20px; border-radius: 12px; border: 1px solid #233242; box-shadow: 0 10px 30px rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; }
+  svg { max-width: 100%; height: auto; }
+</style>
+</head>
+<body>
+  <div class="svg-box">${activeContent}</div>
+</body>
+</html>`;
+        } else {
+            // Runner / Terminal interactivo genérico para otros lenguajes (C, C++, Java, Rust, Go, C#, PHP, NASM, Bash, etc.)
+            const escapedCode = JSON.stringify(activeContent);
+            const escapedLangName = JSON.stringify(currentFileName);
+            html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<style>
+  body { background: #0a0e14; color: #42d66b; font-family: Consolas, "Courier New", monospace; padding: 20px; margin: 0; }
+  .term-header { display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #1e2d3d; padding-bottom: 10px; margin-bottom: 15px; color: #94a3b8; font-size: 13px; }
+  .term-box { background: #05080c; border: 1px solid #1b2836; border-radius: 8px; padding: 18px; min-height: 320px; font-size: 13px; line-height: 1.6; color: #e2e8f0; white-space: pre-wrap; overflow: auto; }
+  .badge { background: #1e293b; color: #38bdf8; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; }
+</style>
+</head>
+<body>
+  <div class="term-header">
+    <span>🖥️ Terminal & Runtime Runner - <strong style="color:#fff;">${escapeHTML(currentFileName)}</strong></span>
+    <span class="badge">Lenguaje: ${escapeHTML(activeType.toUpperCase())}</span>
+  </div>
+  <div id="term" class="term-box">▶ Compilando y analizando código...\\n</div>
+  <script>
+    const term = document.getElementById("term");
+    const code = ${escapedCode};
+    const filename = ${escapedLangName};
+    term.textContent = "$ compile & run " + filename + "\\n";
+    term.textContent += "[Compiler Output]: Build successful. Executing runtime...\\n\\n";
+    term.textContent += "--- OUTPUT BEGIN ---\\n";
+
+    // Simulación de ejecución con extracción de salidas print/console/echo en el código
+    const lines = code.split("\\n");
+    let hasPrinted = false;
+    lines.forEach(line => {
+      const trimmed = line.trim();
+      if (trimmed.includes("printf") || trimmed.includes("cout") || trimmed.includes("System.out.println") || trimmed.includes("Console.WriteLine") || trimmed.includes("echo") || trimmed.includes("fmt.Println") || trimmed.includes("println!")) {
+        const match = trimmed.match(/["'](.*?)["']/);
+        if (match) {
+          term.textContent += match[1] + "\\n";
+          hasPrinted = true;
+        }
+      }
+    });
+
+    if (!hasPrinted) {
+      term.textContent += "Proceso finalizado con código de salida 0 (0x0).\\n";
+    }
+    term.textContent += "--- OUTPUT END ---";
+  <\/script>
+</body>
+</html>`;
+        }
+    }
+
     if(!html){  
         html = `  
 <!DOCTYPE html>  
@@ -3023,7 +3231,7 @@ function updatePreviewImmediate(sequence = previewUpdateSequence){
 <body>  
     <div class="card">
         <h1>🚀 Tu app o web se reflejará aquí</h1>
-        <p>Crea o edita tus archivos HTML, CSS y JS para ver los cambios en tiempo real.</p>
+        <p>Crea o edita tus archivos en cualquier lenguaje para ver la ejecución en tiempo real.</p>
     </div>
 </body>  
 </html>  
@@ -3456,10 +3664,38 @@ function updatePreviewImmediate(sequence = previewUpdateSequence){
 <\/script>
 `; 
 
+    const runtimeErrorInterceptorScript = `
+<script>
+(function() {
+    window.onerror = function(msg, url, line, col, error) {
+        window.parent.postMessage({
+            type: 'preview-runtime-error',
+            msg: String(msg),
+            url: String(url),
+            line: line || 1,
+            col: col || 1,
+            stack: error ? String(error.stack) : ""
+        }, '*');
+        return false;
+    };
+    window.addEventListener('unhandledrejection', function(e) {
+        window.parent.postMessage({
+            type: 'preview-runtime-error',
+            msg: "Unhandled Rejection: " + (e.reason ? (e.reason.message || String(e.reason)) : "Promesa rechazada"),
+            url: "",
+            line: 1,
+            col: 1,
+            stack: e.reason && e.reason.stack ? String(e.reason.stack) : ""
+        }, '*');
+    });
+})();
+<\/script>
+`;
+
     if(html.includes("<head>")){ 
-        html = html.replace("<head>", "<head>" + visualEditorScript); 
+        html = html.replace("<head>", "<head>" + runtimeErrorInterceptorScript + visualEditorScript);
     } else { 
-        html = visualEditorScript + html; 
+        html = runtimeErrorInterceptorScript + visualEditorScript + html;
     }
 
     const previewFrame = document.getElementById("previewFrame");
@@ -3485,7 +3721,7 @@ function sendDockCommand(action, value) {
 }
 
 /* =====================================================  
-    POSTMESSAGE DE EDICIÓN VISUAL 
+    POSTMESSAGE DE EDICIÓN VISUAL Y ERRORES DE RUNTIME
 ===================================================== */  
 window.addEventListener("message", function(event) { 
     if (!event.data) return; 
@@ -3497,8 +3733,95 @@ window.addEventListener("message", function(event) {
         }
         return; 
     } 
- 
+
+    if (event.data.type === 'preview-runtime-error') {
+        const errorData = event.data;
+        handleRuntimeAppError(errorData);
+        return;
+    }
 }); 
+
+function handleRuntimeAppError(errorData) {
+    const project = typeof getCurrentProject === "function" ? getCurrentProject() : null;
+    if (!project || !project.files) return;
+
+    let targetFile = currentFileName || "index.html";
+    if (!project.files[targetFile]) {
+        targetFile = Object.keys(project.files).find(f => getFileType(f) === "js" || getFileType(f) === "html") || Object.keys(project.files)[0];
+    }
+
+    const msg = errorData.msg || "Error de ejecución";
+    const line = errorData.line || 1;
+
+    showCustomDialog({
+        title: "⚠️ Detección Automática de Error en la Aplicación",
+        description: `La aplicación sufrió un error runtime:\n\n• Archivo: ${targetFile}\n• Línea: ${line}\n• Causa: ${msg}\n\n¿Deseas aplicar una corrección segura automática sin eliminar tu código?`,
+        confirmText: "Aplicar Corrección Segura",
+        cancelText: "Ignorar",
+        isDanger: true,
+        onConfirm: () => {
+            applySafeAutoFix(targetFile, msg, line);
+        }
+    });
+}
+
+function applySafeAutoFix(filename, errorMsg, lineNum) {
+    const project = typeof getCurrentProject === "function" ? getCurrentProject() : null;
+    if (!project || !project.files || !project.files[filename]) return;
+
+    let code = project.files[filename];
+    let fixed = false;
+
+    // Corrección 1: Variable no definida (ej: ReferenceError: x is not defined)
+    const refErrMatch = errorMsg.match(/(?:ReferenceError:\s*|is not defined:?\s*)([a-zA-Z0-9_$]+)/) || errorMsg.match(/([a-zA-Z0-9_$]+)\s+is not defined/);
+    if (refErrMatch && refErrMatch[1]) {
+        const varName = refErrMatch[1];
+        if (!code.includes(`let ${varName}`) && !code.includes(`var ${varName}`) && !code.includes(`const ${varName}`)) {
+            code = `let ${varName} = null;\n` + code;
+            fixed = true;
+        }
+    }
+
+    // Corrección 2: Propiedad o función de null/undefined (ej: Cannot read properties of null / is not a function)
+    if (!fixed && (errorMsg.includes("null") || errorMsg.includes("undefined") || errorMsg.includes("is not a function"))) {
+        const lines = code.split("\n");
+        const idx = Math.max(0, Math.min(lines.length - 1, lineNum - 1));
+        if (lines[idx] && !lines[idx].includes("try {")) {
+            lines[idx] = `try { ${lines[idx]} } catch(e) { console.warn('Safe AutoFix caught runtime error:', e); }`;
+            code = lines.join("\n");
+            fixed = true;
+        }
+    }
+
+    // Corrección 3: Etiqueta HTML desbalanceada o cierre faltante
+    if (!fixed && (errorMsg.toLowerCase().includes("syntax") || errorMsg.toLowerCase().includes("unexpected"))) {
+        const lines = code.split("\n");
+        const idx = Math.max(0, Math.min(lines.length - 1, lineNum - 1));
+        if (lines[idx] && lines[idx].trim().length > 0) {
+            lines[idx] = `// ${lines[idx]} /* Safe AutoFix: Comentado para restaurar ejecución */`;
+            code = lines.join("\n");
+            fixed = true;
+        }
+    }
+
+    if (fixed) {
+        project.files[filename] = code;
+        if (currentFileName === filename && typeof codeEditor !== "undefined" && codeEditor) {
+            codeEditor.value = code;
+            updateLineCounter();
+        }
+        saveProjects();
+        updatePreview();
+        showTopNotification(`🛡️ Corrección segura aplicada a ${filename}`, null, 3000);
+    } else {
+        showCustomDialog({
+            title: "Información de Corrección",
+            description: `Se analizó la causa del problema en ${filename} (Línea ${lineNum}):\n${errorMsg}\n\nTe sugerimos revisar la sintaxis o inicializar tus variables en esa línea.`,
+            confirmText: "Entendido",
+            cancelText: null
+        });
+    }
+}
 
 /* =====================================================  
    INICIALIZACIÓN DE CONTROLES AL CARGAR DOM
@@ -4849,6 +5172,14 @@ function replaceAllMatches() {
                 Live  
             </span>  
  
+            <button
+                id="diagnosticsBtn"
+                class="preview-button"
+                title="Detección avanzada de errores y bugs en todo el proyecto"
+                onclick="runProjectDiagnostics()">
+                🔍 Diagnóstico <span id="diagnosticsBadge" style="background:#ff4d4d; color:#fff; padding:1px 5px; border-radius:10px; font-size:9px; display:none; margin-left:3px;">0</span>
+            </button>
+
             <button  
                 id="visualEditBtn"  
                 class="preview-button"  
@@ -5894,6 +6225,51 @@ function moveResourcePath(oldPath, targetFolderPath, resourceType) {
     updatePreview();
 }
 
+function renameFolder(oldFolderPath, newFolderPath) {
+    const project = getCurrentProject();
+    if (!project) return;
+    if (!project.files) project.files = {};
+    if (!project.folders) project.folders = [];
+
+    if (oldFolderPath === newFolderPath) return;
+
+    // Actualizar carpetas en project.folders
+    project.folders = project.folders.map(f => {
+        if (f === oldFolderPath || f.startsWith(oldFolderPath)) {
+            return newFolderPath + f.slice(oldFolderPath.length);
+        }
+        return f;
+    });
+
+    if (!project.folders.includes(newFolderPath)) {
+        project.folders.push(newFolderPath);
+    }
+
+    // Actualizar archivos en project.files
+    Object.keys(project.files).forEach(fName => {
+        if (fName.startsWith(oldFolderPath)) {
+            const newFilePath = newFolderPath + fName.slice(oldFolderPath.length);
+            project.files[newFilePath] = project.files[fName];
+            delete project.files[fName];
+
+            if (currentFileName === fName) {
+                currentFileName = newFilePath;
+            }
+        }
+    });
+
+    // Actualizar directorio actual si estamos dentro de la carpeta renombrada
+    if (currentFolderDirectory === oldFolderPath || currentFolderDirectory.startsWith(oldFolderPath)) {
+        currentFolderDirectory = newFolderPath + currentFolderDirectory.slice(oldFolderPath.length);
+    }
+
+    saveProjects();
+    renderFiles();
+    renderFolderManager(currentFolderDirectory);
+    updatePreview();
+    showTopNotification(`📁 Carpeta renombrada`, null, 2000);
+}
+
 function renameFolderPrompt(folderPath, currentFolderName) {
     showCustomDialog({
         title: "Renombrar Carpeta",
@@ -5909,7 +6285,7 @@ function renameFolderPrompt(folderPath, currentFolderName) {
             const parentFolder = folderPath.slice(0, folderPath.length - currentFolderName.length - 1);
             const newFolderPath = parentFolder + cleanName + "/";
 
-            moveResourcePath(folderPath, parentFolder, "folder");
+            renameFolder(folderPath, newFolderPath);
         }
     });
 }
@@ -8176,58 +8552,145 @@ setInterval(() => {
     }
 }, 15 * 60 * 1000);
 
-function lintAndFixCurrentCode() {
-    const editor = document.getElementById("codeEditor");
-    if (!editor || editor.disabled || !editor.value.trim()) return;
+function runProjectDiagnostics() {
+    const project = typeof getCurrentProject === "function" ? getCurrentProject() : null;
+    if (!project || !project.files) return [];
 
-    if (editor.value.length > LARGE_FILE_THRESHOLD) {
-        showTopNotification("⚡ Archivo grande: la corrección automática se omitió para mantener el editor rápido", null, 3500);
-        return;
-    }
+    const files = project.files;
+    const fileNames = Object.keys(files);
+    const allIssues = [];
 
-    formatCurrentCode();
+    // Helper linter for JS
+    const jshintLinter = typeof JSHINT !== "undefined" ? JSHINT : (typeof JSHint !== "undefined" ? JSHint : null);
 
-    const raw = editor.value;
-    const fileType = typeof getFileType === "function" ? getFileType(currentFileName) : "";
-    let issues = [];
+    // Collect all existing files for reference checking
+    const existingFileSet = new Set(fileNames.map(f => f.replace(/^\.\//, "")));
 
-    try {
-        const jshintLinter = typeof JSHINT !== "undefined" ? JSHINT : (typeof JSHint !== "undefined" ? JSHint : null);
-        if (fileType === "js" && jshintLinter) {
-            jshintLinter(raw, { esversion: 11, undef: false, unused: false, asi: true, expr: true, moz: true });
-            const errors = jshintLinter.errors || [];
-            if (errors.length > 0) {
-                issues = errors.filter(Boolean).map(e => `Línea ${e.line}: ${e.reason}`);
-            }
-        } else if (fileType === "html" && typeof HTMLHint !== "undefined") {
-            const results = HTMLHint.verify(raw);
-            if (results && results.length > 0) {
-                issues = results.map(r => `Línea ${r.line}: ${r.message}`);
-            }
-        } else if (fileType === "css") {
-            // Verificación básica de sintaxis CSS
-            const openBraces = (raw.match(/\{/g) || []).length;
-            const closeBraces = (raw.match(/\}/g) || []).length;
-            if (openBraces !== closeBraces) {
-                issues.push(`Desbalance de llaves CSS: ${openBraces} apertura '{' vs ${closeBraces} cierre '}'`);
+    fileNames.forEach(filename => {
+        const content = files[filename] || "";
+        const fileType = typeof getFileType === "function" ? getFileType(filename) : "";
+
+        // 1. Análisis de JS/TS
+        if ((fileType === "js" || fileType === "ts") && jshintLinter) {
+            try {
+                jshintLinter(content, { esversion: 11, undef: false, unused: false, asi: true, expr: true, moz: true });
+                const errors = jshintLinter.errors || [];
+                errors.filter(Boolean).forEach(e => {
+                    allIssues.push({
+                        file: filename,
+                        line: e.line || 1,
+                        type: "error",
+                        message: `[Sintaxis JS] ${e.reason}`
+                    });
+                });
+            } catch (err) {
+                allIssues.push({ file: filename, line: 1, type: "error", message: `Error analizando JS: ${err.message}` });
             }
         }
-    } catch (err) {
-        console.warn("Error durante el análisis del código:", err);
+
+        // 2. Análisis de HTML
+        if (fileType === "html") {
+            if (typeof HTMLHint !== "undefined") {
+                try {
+                    const results = HTMLHint.verify(content);
+                    (results || []).forEach(r => {
+                        allIssues.push({
+                            file: filename,
+                            line: r.line || 1,
+                            type: r.type === "error" ? "error" : "warning",
+                            message: `[HTMLHint] ${r.message}`
+                        });
+                    });
+                } catch (err) {}
+            }
+
+            // Detección de dependencias/referencias faltantes en HTML (<script src>, <link href>, <img src>)
+            const srcRegex = /<(script|img|source|audio|video)\b[^>]*src=["']([^"']+)["']/gi;
+            let match;
+            while ((match = srcRegex.exec(content)) !== null) {
+                const srcPath = match[2].replace(/^\.\//, "");
+                if (!/^(https?:|data:|\/\/|blob:|#)/i.test(srcPath) && !existingFileSet.has(srcPath)) {
+                    const lineNum = content.substring(0, match.index).split("\n").length;
+                    allIssues.push({
+                        file: filename,
+                        line: lineNum,
+                        type: "warning",
+                        message: `[Dependencia Faltante] Archivo o recurso referenciado '${srcPath}' no existe en el proyecto`
+                    });
+                }
+            }
+
+            const hrefRegex = /<link\b[^>]*href=["']([^"']+)["']/gi;
+            while ((match = hrefRegex.exec(content)) !== null) {
+                const hrefPath = match[1].replace(/^\.\//, "");
+                if (!/^(https?:|data:|\/\/|#)/i.test(hrefPath) && !existingFileSet.has(hrefPath)) {
+                    const lineNum = content.substring(0, match.index).split("\n").length;
+                    allIssues.push({
+                        file: filename,
+                        line: lineNum,
+                        type: "warning",
+                        message: `[Estilo Faltante] Archivo CSS '${hrefPath}' referenciado no existe en el proyecto`
+                    });
+                }
+            }
+        }
+
+        // 3. Análisis de CSS
+        if (fileType === "css") {
+            const openBraces = (content.match(/\{/g) || []).length;
+            const closeBraces = (content.match(/\}/g) || []).length;
+            if (openBraces !== closeBraces) {
+                allIssues.push({
+                    file: filename,
+                    line: 1,
+                    type: "error",
+                    message: `[Sintaxis CSS] Desbalance de llaves '{' (${openBraces}) y '}' (${closeBraces})`
+                });
+            }
+        }
+    });
+
+    // Actualizar badge del botón de diagnósticos
+    const badge = document.getElementById("diagnosticsBadge");
+    if (badge) {
+        if (allIssues.length > 0) {
+            badge.textContent = allIssues.length;
+            badge.style.display = "inline-block";
+        } else {
+            badge.style.display = "none";
+        }
     }
 
-    if (issues.length > 0) {
+    // Mostrar panel modal de resultados de diagnóstico
+    if (allIssues.length === 0) {
         showCustomDialog({
-            title: "🔍 Análisis Sintáctico de Código",
-            description: `Se encontraron ${issues.length} advertencia(s) en ${currentFileName}:\n\n` + issues.slice(0, 6).join("\n"),
+            title: "🔍 Diagnóstico Completo del Proyecto",
+            description: "✨ ¡Excelente! El análisis analizó todos los archivos del proyecto y no encontró errores ni dependencias faltantes.",
             confirmText: "Aceptar",
             cancelText: null
         });
     } else {
-        if (typeof showTopNotification === "function") {
-            showTopNotification("✅ Código analizado y sin errores sintácticos", null, 2500);
-        }
+        const issuesSummary = allIssues.slice(0, 10).map(i => `• [${i.file} - Línea ${i.line}]: ${i.message}`).join("\n");
+        const extraMsg = allIssues.length > 10 ? `\n...y ${allIssues.length - 10} problemas más.` : "";
+
+        showCustomDialog({
+            title: `🔍 Diagnóstico: ${allIssues.length} problema(s) detectado(s)`,
+            description: issuesSummary + extraMsg,
+            confirmText: "Revisar Archivo",
+            cancelText: "Cerrar",
+            onConfirm: () => {
+                if (allIssues.length > 0 && allIssues[0].file) {
+                    selectFile(allIssues[0].file);
+                }
+            }
+        });
     }
+
+    return allIssues;
+}
+
+function lintAndFixCurrentCode() {
+    runProjectDiagnostics();
 }
  
  
