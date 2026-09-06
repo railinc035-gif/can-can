@@ -664,15 +664,14 @@ button{border:0;cursor:pointer}
 }  
 
 .preview-frame.mobile{
-    height: calc(100% - 32px);
-    max-height: calc(100% - 32px);
-    width: auto;
-    aspect-ratio: 9 / 18.5;
-    max-width: calc(100% - 32px);
-    margin: 16px;
-    border-radius: 28px;
-    border: 8px solid #1a1a1a;
-    box-shadow: 0 15px 40px rgba(0,0,0,0.6);
+    width: 375px !important;
+    max-width: calc(100% - 24px) !important;
+    height: 667px !important;
+    max-height: calc(100% - 24px) !important;
+    margin: auto !important;
+    border-radius: 28px !important;
+    border: 8px solid #1a1a1a !important;
+    box-shadow: 0 15px 40px rgba(0,0,0,0.6) !important;
 }
 
 
@@ -9211,11 +9210,22 @@ document.addEventListener("touchcancel", stopWorkspaceResize);
 const desktopPreview = document.getElementById("desktopPreview");  
 const mobilePreview = document.getElementById("mobilePreview");  
 
+function notifyPreviewResize() {
+    const frame = document.getElementById("previewFrame");
+    if (frame && frame.contentWindow) {
+        try {
+            frame.contentWindow.dispatchEvent(new Event("resize"));
+            frame.contentWindow.postMessage({ type: "viewport-resized" }, "*");
+        } catch (e) {}
+    }
+}
+
 if (desktopPreview) {
     desktopPreview.addEventListener("click", () => {  
         previewFrame.className = "preview-frame";
         desktopPreview.classList.add("active");  
         if (mobilePreview) mobilePreview.classList.remove("active");  
+        setTimeout(notifyPreviewResize, 100);
     });  
 }
 
@@ -9224,6 +9234,7 @@ if (mobilePreview) {
         previewFrame.className = "preview-frame mobile";
         mobilePreview.classList.add("active");  
         if (desktopPreview) desktopPreview.classList.remove("active");  
+        setTimeout(notifyPreviewResize, 100);
     });  
 }
   
