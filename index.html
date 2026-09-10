@@ -100,7 +100,9 @@ button{border:0;cursor:pointer}
   
     padding:0 14px;  
   
-    background:#080808;  
+    background:rgba(9, 11, 15, 0.75);
+    backdrop-filter:blur(10px);
+    -webkit-backdrop-filter:blur(10px);
     border-bottom:1px solid var(--border);  
   
     z-index:100;  
@@ -2236,10 +2238,10 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
     }
 .miwy-create-project:hover { background: var(--miwy-orange); box-shadow: 0 8px 24px rgba(255, 122, 26, .2); }
 .miwy-projects-list { gap: 14px; }
-.miwy-project-card { min-height: 150px; background: linear-gradient(145deg, #111820, #0d1218); border-color: #263442; box-shadow: 0 12px 28px rgba(0, 0, 0, .16); }
+.miwy-project-card { min-height: 120px; background: rgba(16, 22, 30, 0.55); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border: 1px solid rgba(255, 255, 255, 0.12); box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35); }
 .miwy-project-card::before { color: var(--miwy-orange); }
-.miwy-project-card:hover { border-color: var(--miwy-orange); box-shadow: 0 14px 30px rgba(255, 122, 26, .16); }
-.miwy-project-icon { background: #16232b; border-color: #2d9eae; color: var(--miwy-orange); }
+.miwy-project-card:hover { border-color: rgba(255, 122, 26, 0.6); transform: translateY(-2px); box-shadow: 0 12px 30px rgba(255, 122, 26, 0.2); }
+.miwy-project-icon { background: rgba(12, 18, 24, 0.6); border-color: rgba(255, 255, 255, 0.15); color: var(--miwy-orange); }
 .miwy-project-description { color: #9eabb6; }
 .miwy-open-btn { background: var(--miwy-orange); border-color: var(--miwy-orange); }
 .miwy-open-btn:hover { background: var(--miwy-orange-soft); border-color: var(--miwy-orange-soft); }
@@ -2328,13 +2330,15 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
 
 .miwy-project-card {
     width: min(100%, 360px);
-    min-height: 112px;
-    padding: 12px;
-    gap: 10px;
-    border-radius: 7px;
-    background: #10161c;
-    border-color: #263442;
-    box-shadow: none;
+    min-height: 120px;
+    padding: 14px;
+    gap: 12px;
+    border-radius: 10px;
+    background: rgba(16, 22, 30, 0.55);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
 }
 
 .miwy-project-card::before {
@@ -2342,17 +2346,33 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
 }
 
 .miwy-project-card:hover {
-    border-color: #ff7a1a;
-    transform: translateY(-1px);
-    box-shadow: 0 8px 20px rgba(0,0,0,.22);
+    border-color: rgba(255, 122, 26, 0.6);
+    transform: translateY(-2px);
+    box-shadow: 0 12px 30px rgba(255, 122, 26, 0.2);
 }
 
 .miwy-project-card-header {
-    gap: 10px;
+    gap: 12px;
 }
 
 .miwy-project-icon {
-    display: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    height: 48px;
+    flex: 0 0 48px;
+    border-radius: 8px;
+    background: rgba(12, 18, 24, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    overflow: hidden;
+}
+
+.miwy-project-icon img,
+.miwy-project-icon video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
 }
 
 .miwy-project-name {
@@ -4429,7 +4449,7 @@ function replaceAllMatches() {
 }
 
 /* =========================================================
-   MATRIX CODE RAIN CANVAS ANIMATION (FONDO COMPLETO GALERÍA)
+   MULTICOLOR DYNAMIC CODE CANVAS ANIMATION (FONDO COMPLETO GALERÍA Y LOGO)
    ========================================================= */
 (() => {
   "use strict";
@@ -4440,40 +4460,117 @@ function replaceAllMatches() {
     const ctx = canvas.getContext("2d");
 
     function resize() {
-      const container = document.getElementById("galleryContainer") || document.body;
-      canvas.width = container.clientWidth || window.innerWidth;
-      canvas.height = container.clientHeight || window.innerHeight;
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
     }
     resize();
     window.addEventListener("resize", resize);
 
-    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789</>{};=+0@!%&*";
-    const fontSize = 14;
-    const columns = Math.floor((canvas.width || window.innerWidth) / fontSize) + 1;
-    const drops = new Array(columns).fill(1);
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789</>{};=+0@!%&*const;let;var;function;return;import;export";
+    const fontSize = 13;
+
+    // Flow 1: Falling columns
+    let cols = Math.floor((canvas.width || window.innerWidth) / fontSize) + 1;
+    let downDrops = new Array(cols).fill(0).map(() => Math.random() * -50);
+
+    // Flow 2: Corner streams rising upwards
+    let cornerColsCount = Math.max(2, Math.floor(cols * 0.22));
+    let cornerUpLeft = new Array(cornerColsCount).fill(0).map(() => Math.floor((canvas.height || window.innerHeight) / fontSize) + Math.random() * 20);
+    let cornerUpRight = new Array(cornerColsCount).fill(0).map(() => Math.floor((canvas.height || window.innerHeight) / fontSize) + Math.random() * 20);
+
+    // Flow 3: Horizontal streams crossing from logo topbar area
+    const horizRows = 4;
+    const horizStreams = new Array(horizRows).fill(0).map((_, idx) => ({
+      x: Math.random() * (canvas.width || window.innerWidth),
+      y: 14 + idx * 13,
+      speed: 2 + Math.random() * 3,
+      length: 10 + Math.floor(Math.random() * 15)
+    }));
+
+    const colors = ["#00f0ff", "#ff007f", "#ffe600", "#ff6a00", "#00ff66", "#38bdf8", "#e040fb", "#ffffff"];
+
+    function getRandomColor() {
+      return colors[Math.floor(Math.random() * colors.length)];
+    }
 
     function draw() {
-      ctx.fillStyle = "rgba(9, 11, 15, 0.12)";
+      const gallery = document.getElementById("galleryContainer");
+      if (!gallery || gallery.style.display === "none") {
+        requestAnimationFrame(draw);
+        return;
+      }
+
+      ctx.fillStyle = "rgba(9, 11, 15, 0.16)";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.font = `${fontSize}px monospace`;
 
-      ctx.fillStyle = "#00ff66";
-      ctx.font = fontSize + "px monospace";
-
-      for (let i = 0; i < drops.length; i++) {
+      // 1. Vertical Falling Columns
+      for (let i = 0; i < downDrops.length; i++) {
         const char = chars[Math.floor(Math.random() * chars.length)];
         const x = i * fontSize;
-        const y = drops[i] * fontSize;
+        const y = downDrops[i] * fontSize;
 
-        ctx.fillStyle = Math.random() > 0.92 ? "#ffffff" : (Math.random() > 0.5 ? "#00ff66" : "#00cc55");
+        ctx.fillStyle = Math.random() > 0.88 ? "#ffffff" : getRandomColor();
         ctx.fillText(char, x, y);
 
         if (y > canvas.height && Math.random() > 0.975) {
-          drops[i] = 0;
+          downDrops[i] = 0;
         }
-        drops[i]++;
+        downDrops[i]++;
       }
+
+      // 2. Corner Streams Rising Upwards
+      // Left corner streams
+      for (let i = 0; i < cornerUpLeft.length; i++) {
+        const char = chars[Math.floor(Math.random() * chars.length)];
+        const x = i * fontSize;
+        const y = cornerUpLeft[i] * fontSize;
+
+        ctx.fillStyle = Math.random() > 0.85 ? "#ffffff" : getRandomColor();
+        ctx.fillText(char, x, y);
+
+        if (y < 0 && Math.random() > 0.95) {
+          cornerUpLeft[i] = Math.floor(canvas.height / fontSize) + 5;
+        }
+        cornerUpLeft[i]--;
+      }
+
+      // Right corner streams
+      const startRightCol = Math.max(0, cols - cornerUpRight.length);
+      for (let i = 0; i < cornerUpRight.length; i++) {
+        const char = chars[Math.floor(Math.random() * chars.length)];
+        const x = (startRightCol + i) * fontSize;
+        const y = cornerUpRight[i] * fontSize;
+
+        ctx.fillStyle = Math.random() > 0.85 ? "#ffffff" : getRandomColor();
+        ctx.fillText(char, x, y);
+
+        if (y < 0 && Math.random() > 0.95) {
+          cornerUpRight[i] = Math.floor(canvas.height / fontSize) + 5;
+        }
+        cornerUpRight[i]--;
+      }
+
+      // 3. Horizontal Streams crossing from topbar/logo area
+      for (let s = 0; s < horizStreams.length; s++) {
+        const stream = horizStreams[s];
+        for (let j = 0; j < stream.length; j++) {
+          const char = chars[Math.floor(Math.random() * chars.length)];
+          const hx = (stream.x - j * 12) % canvas.width;
+          if (hx >= 0) {
+            ctx.fillStyle = j === 0 ? "#ffffff" : getRandomColor();
+            ctx.fillText(char, hx, stream.y);
+          }
+        }
+        stream.x += stream.speed;
+        if (stream.x > canvas.width + stream.length * 12) {
+          stream.x = 0;
+        }
+      }
+
       requestAnimationFrame(draw);
     }
+
     draw();
   }
 
@@ -4557,7 +4654,7 @@ body.theme-claro .file-tree, body.theme-claro .editor-container {
   
 <!-- GALERÍA DE PROYECTOS (VISTA INICIAL DE BIENVENIDA) -->
 <div id="galleryContainer" class="miwy-gallery" style="display:block; position:relative; overflow:hidden;">
-    <canvas id="matrixCanvas" style="position:absolute; inset:0; width:100%; height:100%; pointer-events:none; z-index:0; opacity:0.3;"></canvas>
+    <canvas id="matrixCanvas" style="position:fixed; inset:0; width:100vw; height:100vh; pointer-events:none; z-index:0; opacity:0.4;"></canvas>
 
     <div class="miwy-gallery-grid" style="position:relative; z-index:1;">
         <div class="miwy-gallery-main" style="width: 100%;">
@@ -7031,7 +7128,51 @@ function renderProjects(){
 
             const icon = document.createElement("div");
             icon.className = "miwy-project-icon";
-            icon.textContent = "⚡";
+
+            let mediaCoverHtml = null;
+            if (project.files) {
+                const filenames = Object.keys(project.files);
+
+                const isValidMediaUrl = (str) => typeof str === "string" && /^(data:|(https?:|blob:)\/\/)/i.test(str.trim());
+
+                // Priority 1: Check for video files or video content
+                for (const filename of filenames) {
+                    const fType = typeof getFileType === "function" ? getFileType(filename) : "";
+                    const content = project.files[filename];
+                    const isVid = fType === "video" || (typeof content === "string" && (content.startsWith("data:video") || content.includes("<video")));
+                    if (isVid) {
+                        if (isValidMediaUrl(content)) {
+                            mediaCoverHtml = `<video src="${content}#t=0.5" muted playsinline loop preload="metadata" style="width:100%; height:100%; object-fit:cover; border-radius:6px; pointer-events:none;"></video>`;
+                        } else {
+                            mediaCoverHtml = `<span style="font-size:22px;">🎬</span>`;
+                        }
+                        break;
+                    }
+                }
+
+                // Priority 2: Check for image files if no video was found
+                if (!mediaCoverHtml) {
+                    for (const filename of filenames) {
+                        const fType = typeof getFileType === "function" ? getFileType(filename) : "";
+                        const content = project.files[filename];
+                        const isImg = fType === "image" || (typeof content === "string" && content.startsWith("data:image"));
+                        if (isImg) {
+                            if (isValidMediaUrl(content)) {
+                                mediaCoverHtml = `<img src="${content}" alt="${escapeHTML(filename)}" style="width:100%; height:100%; object-fit:cover; border-radius:6px; pointer-events:none;" />`;
+                            } else {
+                                mediaCoverHtml = `<span style="font-size:22px;">🖼️</span>`;
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (mediaCoverHtml) {
+                icon.innerHTML = mediaCoverHtml;
+            } else {
+                icon.textContent = "⚡";
+            }
 
             const info = document.createElement("div");
             info.className = "miwy-project-info";
