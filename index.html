@@ -3997,6 +3997,19 @@ document.addEventListener("DOMContentLoaded", function() {
                 let clampedX = Math.max(minX, Math.min(rawX, Math.max(minX, maxX)));
                 let clampedY = Math.max(minY, Math.min(rawY, Math.max(minY, maxY)));
 
+                // Magnetic corner & edge snapping (18px snap threshold)
+                const snapThreshold = 18;
+                const edgeMinX = 5;
+                const edgeMaxX = Math.max(edgeMinX, window.innerWidth - dockWidth - 5);
+                const edgeMinY = 5;
+                const edgeMaxY = Math.max(edgeMinY, window.innerHeight - dockHeight - 5);
+
+                if (Math.abs(clampedX - edgeMinX) < snapThreshold) clampedX = edgeMinX;
+                else if (Math.abs(clampedX - edgeMaxX) < snapThreshold) clampedX = edgeMaxX;
+
+                if (Math.abs(clampedY - edgeMinY) < snapThreshold) clampedY = edgeMinY;
+                else if (Math.abs(clampedY - edgeMaxY) < snapThreshold) clampedY = edgeMaxY;
+
                 parentDock.style.left = clampedX + "px";
                 parentDock.style.top = clampedY + "px";
 
@@ -8769,7 +8782,7 @@ function reloadRealPhoneFrame() {
         <span>⋮⋮</span>
     </div>
     <div class="miwy-dock-group">
-        <div class="miwy-tb-item"><button class="miwy-tb-btn" data-act="text" title="Editar texto"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M13.23 1l2.77 2.77-9.69 9.69H3.54V10.7L13.23 1zM2 14h12v1H2v-1z"/></svg></button><span class="miwy-tb-label">Texto</span></div>
+        <div class="miwy-tb-item"><button class="miwy-tb-btn" data-act="text" title="Editar texto"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg></button><span class="miwy-tb-label">Texto</span></div>
         <div class="miwy-tb-item">
             <label class="miwy-chromatic-circle" title="Círculo Cromático (Color / Fondo)">
                 <input type="color" id="__parent_chromaticColor" value="#ff6a00">
@@ -8781,18 +8794,18 @@ function reloadRealPhoneFrame() {
         <div class="miwy-tb-item"><button class="miwy-tb-btn" data-act="font-plus" title="Aumentar fuente" style="font-weight:bold; font-size:11px;">A+</button><span class="miwy-tb-label">Aumentar</span></div>
         <div class="miwy-tb-item"><button class="miwy-tb-btn" data-act="font-minus" title="Reducir fuente" style="font-weight:bold; font-size:11px;">A-</button><span class="miwy-tb-label">Reducir</span></div>
         <div class="miwy-tb-item"><button class="miwy-tb-btn" data-act="bold" title="Negrita" style="font-weight:bold; font-size:12px;">B</button><span class="miwy-tb-label">Negrita</span></div>
-        <div class="miwy-tb-item"><button class="miwy-tb-btn" data-act="radius" title="Redondear bordes"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M3 3h4v1H4v3H3V3zm10 0h-4v1h3v3h1V3zM3 13h4v-1H4v-3H3v4zm10 0h-4v-1h3v-3h1v4z"/></svg></button><span class="miwy-tb-label">Borde</span></div>
+        <div class="miwy-tb-item"><button class="miwy-tb-btn" data-act="radius" title="Redondear bordes"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="5" ry="5"></rect></svg></button><span class="miwy-tb-label">Borde</span></div>
     </div>
     <div class="miwy-dock-group">
-        <div class="miwy-tb-item"><button class="miwy-tb-btn" data-act="add-btn" title="Agregar Botón"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M2 4h12a1 1 0 011 1v6a1 1 0 01-1 1H2a1 1 0 01-1-1V5a1 1 0 011-1zm1 2v4h10V6H3z"/></svg></button><span class="miwy-tb-label">Botón</span></div>
-        <div class="miwy-tb-item"><button class="miwy-tb-btn" data-act="add-card" title="Agregar Tarjeta"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M1 3a1 1 0 011-1h12a1 1 0 011 1v10a1 1 0 01-1 1H2a1 1 0 01-1-1V3zm2 1v2h10V4H3zm0 4v4h10V8H3z"/></svg></button><span class="miwy-tb-label">Tarjeta</span></div>
-        <div class="miwy-tb-item"><button class="miwy-tb-btn" data-act="add-img" title="Imagen / Subir Foto"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M2 2a1 1 0 00-1 1v10a1 1 0 001 1h12a1 1 0 001-1V3a1 1 0 00-1-1H2zm0 1h12v7.5l-3-3-2 2-3-3-4 4V3zm2 2a1 1 0 100 2 1 1 0 000-2z"/></svg></button><span class="miwy-tb-label">Imagen</span></div>
+        <div class="miwy-tb-item"><button class="miwy-tb-btn" data-act="add-btn" title="Agregar Botón"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="12" rx="4"></rect><path d="M12 10v4"></path><path d="M10 12h4"></path></svg></button><span class="miwy-tb-label">Botón</span></div>
+        <div class="miwy-tb-item"><button class="miwy-tb-btn" data-act="add-card" title="Agregar Tarjeta"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"></rect><path d="M3 9h18"></path></svg></button><span class="miwy-tb-label">Tarjeta</span></div>
+        <div class="miwy-tb-item"><button class="miwy-tb-btn" data-act="add-img" title="Imagen / Subir Foto"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg></button><span class="miwy-tb-label">Imagen</span></div>
     </div>
     <div class="miwy-dock-group">
-        <div class="miwy-tb-item"><button class="miwy-tb-btn" data-act="up" title="Mover arriba"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 3.5l-5 5h3.5V13h3V8.5H13l-5-5z"/></svg></button><span class="miwy-tb-label">Arriba</span></div>
-        <div class="miwy-tb-item"><button class="miwy-tb-btn" data-act="down" title="Mover abajo"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 12.5l5-5H9.5V3h-3v4.5H3l5 5z"/></svg></button><span class="miwy-tb-label">Abajo</span></div>
-        <div class="miwy-tb-item"><button class="miwy-tb-btn" data-act="dup" title="Duplicar"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M4 2h8a1 1 0 011 1v8a1 1 0 01-1 1H4a1 1 0 01-1-1V3a1 1 0 011-1zm0 1v8h8V3H4zm-2 2H1v9a1 1 0 001 1h9v-1H2V5z"/></svg></button><span class="miwy-tb-label">Duplicar</span></div>
-        <div class="miwy-tb-item"><button class="miwy-tb-btn danger" data-act="del" title="Eliminar"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M10 2V1H6v1H2v1h12V2h-4zM3 4v10a1 1 0 001 1h8a1 1 0 001-1V4H3zm3 2h1v6H6V6zm3 0h1v6H9V6z"/></svg></button><span class="miwy-tb-label">Borrar</span></div>
+        <div class="miwy-tb-item"><button class="miwy-tb-btn" data-act="up" title="Mover arriba"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"></line><polyline points="5 12 12 5 19 12"></polyline></svg></button><span class="miwy-tb-label">Arriba</span></div>
+        <div class="miwy-tb-item"><button class="miwy-tb-btn" data-act="down" title="Mover abajo"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg></button><span class="miwy-tb-label">Abajo</span></div>
+        <div class="miwy-tb-item"><button class="miwy-tb-btn" data-act="dup" title="Duplicar"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button><span class="miwy-tb-label">Duplicar</span></div>
+        <div class="miwy-tb-item"><button class="miwy-tb-btn danger" data-act="del" title="Eliminar"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg></button><span class="miwy-tb-label">Borrar</span></div>
     </div>
     <input type="file" id="__parent_fileInput" accept="image/*" style="display:none;">
 </div>
