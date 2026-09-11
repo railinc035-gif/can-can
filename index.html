@@ -3703,19 +3703,31 @@ body.theme-claro .file-tree, body.theme-claro .editor-container {
             var handleResizeStart = function(clientX, clientY) {
                 var startX = clientX, startY = clientY;
                 var startW = selectedTarget.offsetWidth, startH = selectedTarget.offsetHeight;
+                var latestResizeX = clientX, latestResizeY = clientY;
+                var isResizing = true;
                 var rafId = null;
 
+                var updateResize = function() {
+                    rafId = null;
+                    if (!isResizing) return;
+                    selectedTarget.style.width = Math.max(20, startW + (latestResizeX - startX)) + 'px';
+                    selectedTarget.style.height = Math.max(20, startH + (latestResizeY - startY)) + 'px';
+                };
+
                 var doResize = function(me) {
-                    if (rafId) cancelAnimationFrame(rafId);
-                    rafId = requestAnimationFrame(function() {
-                        var cx = me.clientX !== undefined ? me.clientX : (me.touches && me.touches[0] ? me.touches[0].clientX : startX);
-                        var cy = me.clientY !== undefined ? me.clientY : (me.touches && me.touches[0] ? me.touches[0].clientY : startY);
-                        selectedTarget.style.width = Math.max(20, startW + (cx - startX)) + 'px';
-                        selectedTarget.style.height = Math.max(20, startH + (cy - startY)) + 'px';
-                    });
+                    if (!isResizing) return;
+                    latestResizeX = me.clientX !== undefined ? me.clientX : (me.touches && me.touches[0] ? me.touches[0].clientX : startX);
+                    latestResizeY = me.clientY !== undefined ? me.clientY : (me.touches && me.touches[0] ? me.touches[0].clientY : startY);
+                    if (!rafId) {
+                        rafId = requestAnimationFrame(updateResize);
+                    }
                 };
                 var stopResize = function() {
-                    if (rafId) cancelAnimationFrame(rafId);
+                    isResizing = false;
+                    if (rafId) {
+                        cancelAnimationFrame(rafId);
+                        rafId = null;
+                    }
                     window.removeEventListener('mousemove', doResize);
                     window.removeEventListener('mouseup', stopResize);
                     window.removeEventListener('touchmove', doResize);
@@ -3753,22 +3765,31 @@ body.theme-claro .file-tree, body.theme-claro .editor-container {
                 var startX = clientX, startY = clientY;
                 var startLeft = parseFloat(selectedTarget.style.left) || 0;
                 var startTop = parseFloat(selectedTarget.style.top) || 0;
+                var latestMoveX = clientX, latestMoveY = clientY;
                 var elemRafId = null;
+
+                var updateElemMove = function() {
+                    elemRafId = null;
+                    if (!draggingElem) return;
+                    selectedTarget.style.left = (startLeft + (latestMoveX - startX)) + 'px';
+                    selectedTarget.style.top = (startTop + (latestMoveY - startY)) + 'px';
+                };
 
                 var doElemMove = function(me) {
                     if (!draggingElem) return;
-                    if (elemRafId) cancelAnimationFrame(elemRafId);
-                    elemRafId = requestAnimationFrame(function() {
-                        var cx = me.clientX !== undefined ? me.clientX : (me.touches && me.touches[0] ? me.touches[0].clientX : startX);
-                        var cy = me.clientY !== undefined ? me.clientY : (me.touches && me.touches[0] ? me.touches[0].clientY : startY);
-                        selectedTarget.style.left = (startLeft + (cx - startX)) + 'px';
-                        selectedTarget.style.top = (startTop + (cy - startY)) + 'px';
-                    });
+                    latestMoveX = me.clientX !== undefined ? me.clientX : (me.touches && me.touches[0] ? me.touches[0].clientX : startX);
+                    latestMoveY = me.clientY !== undefined ? me.clientY : (me.touches && me.touches[0] ? me.touches[0].clientY : startY);
+                    if (!elemRafId) {
+                        elemRafId = requestAnimationFrame(updateElemMove);
+                    }
                 };
 
                 var stopElemMove = function() {
                     draggingElem = false;
-                    if (elemRafId) cancelAnimationFrame(elemRafId);
+                    if (elemRafId) {
+                        cancelAnimationFrame(elemRafId);
+                        elemRafId = null;
+                    }
                     window.removeEventListener('mousemove', doElemMove);
                     window.removeEventListener('mouseup', stopElemMove);
                     window.removeEventListener('touchmove', doElemMove);
@@ -3924,82 +3945,97 @@ document.addEventListener("DOMContentLoaded", function() {
     if (parentDock && parentHandle) {
         let draggingParentDock = false;
         let pOffsetX = 0, pOffsetY = 0;
+        let latestX = 0, latestY = 0;
+        let dockRafId = null;
 
         var startDockDrag = function(clientX, clientY) {
             draggingParentDock = true;
+            latestX = clientX;
+            latestY = clientY;
             const rect = parentDock.getBoundingClientRect();
             pOffsetX = clientX - rect.left;
             pOffsetY = clientY - rect.top;
             parentDock.style.transform = "none";
             parentDock.style.bottom = "auto";
             parentDock.style.right = "auto";
+            parentDock.style.willChange = "left, top";
         };
 
-        let dockRafId = null;
+        var updateDockPosition = function() {
+            dockRafId = null;
+            if (!draggingParentDock) return;
+
+            const dockWidth = parentDock.offsetWidth || 300;
+            const dockHeight = parentDock.offsetHeight || 50;
+
+            let rawX = latestX - pOffsetX;
+            let rawY = latestY - pOffsetY;
+
+            const threshold = 20;
+            const maxRawX = window.innerWidth - dockWidth;
+            const maxRawY = window.innerHeight - dockHeight;
+
+            let isTop = rawY <= threshold;
+            let isBottom = rawY >= maxRawY - threshold;
+            let isLeft = rawX <= threshold;
+            let isRight = rawX >= maxRawX - threshold;
+
+            let finalX = rawX;
+            let finalY = rawY;
+
+            if (isTop) {
+                finalY = 0;
+                parentDock.classList.add("dock-welded-top");
+            } else {
+                parentDock.classList.remove("dock-welded-top");
+            }
+
+            if (isBottom) {
+                finalY = maxRawY;
+                parentDock.classList.add("dock-welded-bottom");
+            } else {
+                parentDock.classList.remove("dock-welded-bottom");
+            }
+
+            if (isLeft) {
+                finalX = 0;
+                parentDock.classList.add("dock-welded-left");
+            } else {
+                parentDock.classList.remove("dock-welded-left");
+            }
+
+            if (isRight) {
+                finalX = maxRawX;
+                parentDock.classList.add("dock-welded-right");
+            } else {
+                parentDock.classList.remove("dock-welded-right");
+            }
+
+            let clampedX = Math.max(0, Math.min(finalX, window.innerWidth - dockWidth));
+            let clampedY = Math.max(0, Math.min(finalY, window.innerHeight - dockHeight));
+
+            parentDock.style.left = clampedX + "px";
+            parentDock.style.top = clampedY + "px";
+
+            savedDockPosition = { x: clampedX, y: clampedY };
+        };
 
         var moveDockDrag = function(clientX, clientY) {
             if (!draggingParentDock) return;
-            if (dockRafId) cancelAnimationFrame(dockRafId);
-            dockRafId = requestAnimationFrame(() => {
-                const dockWidth = parentDock.offsetWidth || 300;
-                const dockHeight = parentDock.offsetHeight || 50;
-
-                let rawX = clientX - pOffsetX;
-                let rawY = clientY - pOffsetY;
-
-                const threshold = 20;
-                const maxRawX = window.innerWidth - dockWidth;
-                const maxRawY = window.innerHeight - dockHeight;
-
-                let isTop = rawY <= threshold;
-                let isBottom = rawY >= maxRawY - threshold;
-                let isLeft = rawX <= threshold;
-                let isRight = rawX >= maxRawX - threshold;
-
-                let finalX = rawX;
-                let finalY = rawY;
-
-                if (isTop) {
-                    finalY = 0;
-                    parentDock.classList.add("dock-welded-top");
-                } else {
-                    parentDock.classList.remove("dock-welded-top");
-                }
-
-                if (isBottom) {
-                    finalY = maxRawY;
-                    parentDock.classList.add("dock-welded-bottom");
-                } else {
-                    parentDock.classList.remove("dock-welded-bottom");
-                }
-
-                if (isLeft) {
-                    finalX = 0;
-                    parentDock.classList.add("dock-welded-left");
-                } else {
-                    parentDock.classList.remove("dock-welded-left");
-                }
-
-                if (isRight) {
-                    finalX = maxRawX;
-                    parentDock.classList.add("dock-welded-right");
-                } else {
-                    parentDock.classList.remove("dock-welded-right");
-                }
-
-                let clampedX = Math.max(0, Math.min(finalX, window.innerWidth - dockWidth));
-                let clampedY = Math.max(0, Math.min(finalY, window.innerHeight - dockHeight));
-
-                parentDock.style.left = clampedX + "px";
-                parentDock.style.top = clampedY + "px";
-
-                savedDockPosition = { x: clampedX, y: clampedY };
-            });
+            latestX = clientX;
+            latestY = clientY;
+            if (!dockRafId) {
+                dockRafId = requestAnimationFrame(updateDockPosition);
+            }
         };
 
         var endDockDrag = function() {
             draggingParentDock = false;
-            if (dockRafId) cancelAnimationFrame(dockRafId);
+            if (dockRafId) {
+                cancelAnimationFrame(dockRafId);
+                dockRafId = null;
+            }
+            parentDock.style.willChange = "auto";
             if (savedDockPosition) {
                 try {
                     localStorage.setItem("miwy_dock_pos", JSON.stringify(savedDockPosition));
