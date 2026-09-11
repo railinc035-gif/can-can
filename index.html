@@ -2797,6 +2797,23 @@ function saveVisualEditToExistingFile(updatedHtml) {
     const project = typeof getCurrentProject === "function" ? getCurrentProject() : null;
     if (!project || !updatedHtml) return false;
 
+    // Static syntax validation via DOMParser before persisting visual changes
+    try {
+        const parser = new DOMParser();
+        const parsedDoc = parser.parseFromString(updatedHtml, "text/html");
+        const parserErrors = parsedDoc.querySelectorAll("parsererror");
+        if (parserErrors && parserErrors.length > 0) {
+            console.warn("Validación sintáctica fallida en edición visual. Revertiendo cambios:", parserErrors[0].textContent);
+            if (typeof showTopNotification === "function") {
+                showTopNotification("⚠️ Sintaxis inválida detectada en edición visual; cambio revertido automáticamente.", null, 3000);
+            }
+            return false;
+        }
+    } catch (err) {
+        console.warn("Error en validador sintáctico del editor visual:", err);
+        return false;
+    }
+
     const htmlFile = Object.keys(project.files || {}).find(filename => {
         return typeof getFileType === "function" && getFileType(filename) === "html";
     });
@@ -4670,8 +4687,8 @@ body.theme-claro .file-tree, body.theme-claro .editor-container {
                     onclick="toggleRecursosPlusMenu(event)">+</button>
                 
                 <div id="recursosPlusDropdown" style="display:none; position:absolute; top:32px; left:80px; z-index:1000; background:#10151c; border:1px solid #2b3a48; border-radius:8px; box-shadow:0 10px 25px rgba(0,0,0,0.5); padding:4px 0; min-width:140px;">
-                    <button onclick="openCreateFilePrompt(); toggleRecursosPlusMenu();" style="width:100%; padding:8px 12px; background:transparent; border:none; color:#edf2f7; text-align:left; font-size:11px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:6px;">📄 Crear archivo</button>
-                    <button onclick="createNewFolderPrompt(); toggleRecursosPlusMenu();" style="width:100%; padding:8px 12px; background:transparent; border:none; color:#edf2f7; text-align:left; font-size:11px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:6px;">📁 Crear carpeta</button>
+                    <button onclick="openCreateFilePrompt(); toggleRecursosPlusMenu();" style="width:100%; padding:8px 12px; background:transparent; border:none; color:#edf2f7; text-align:left; font-size:11px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:8px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--orange)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a1 1 0 0 0 1 1h4"/><path d="M9 15h6"/><path d="M12 12v6"/></svg><span>Crear archivo</span></button>
+                    <button onclick="createNewFolderPrompt(); toggleRecursosPlusMenu();" style="width:100%; padding:8px 12px; background:transparent; border:none; color:#edf2f7; text-align:left; font-size:11px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:8px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--orange)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L8.6 3.3A2 2 0 0 0 6.9 2.5H4a2 2 0 0 0-2 2v13.5a2 2 0 0 0 2 2Z"/><path d="M12 10v6"/><path d="M9 13h6"/></svg><span>Crear carpeta</span></button>
                 </div>
             </div>
 
