@@ -3990,6 +3990,16 @@ document.addEventListener("DOMContentLoaded", function() {
             }
         };
 
+        // Prevent default dblclick jumping / teleportation
+        parentHandle.addEventListener("dblclick", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+        });
+        parentDock.addEventListener("dblclick", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+        });
+
         // Mouse events
         parentHandle.addEventListener("mousedown", (e) => {
             startDockDrag(e.clientX, e.clientY);
