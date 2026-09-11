@@ -2275,7 +2275,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
     .topbar { padding: 0 12px; }
     .panel-header { padding: 0 10px; }
     .preview-controls .panel-name { display: none; }
-    .preview-wrapper { padding: 10px; }
+    .preview-wrapper { padding: 0; flex: 1; width: 100%; height: 100%; }
     .miwy-gallery { padding: 18px 14px 28px; margin-top: 58px; height: calc(100vh - 58px); }
     .miwy-hero-header { height: 132px; margin-bottom: 24px; }
     .miwy-projects-header { align-items: flex-start; flex-direction: column; gap: 10px; }
@@ -3837,12 +3837,45 @@ body.theme-claro .file-tree, body.theme-claro .editor-container {
 <\/script>
 `; 
 
+    const responsiveStyleInjection = `<style>
+        html, body {
+            width: 100% !important;
+            height: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            box-sizing: border-box !important;
+            overflow-x: hidden !important;
+        }
+        @media (max-width: 768px) {
+            body {
+                display: flex !important;
+                flex-direction: column !important;
+            }
+            .grid, .row, .container, .card-grid, .layout-grid {
+                display: flex !important;
+                flex-direction: column !important;
+                grid-template-columns: 1fr !important;
+                width: 100% !important;
+            }
+            img, video, iframe, canvas {
+                max-width: 100% !important;
+                height: auto !important;
+            }
+        }
+    </style>`;
+
     if(!/<meta\s+name=["']viewport["']/i.test(html)) {
-        const viewportMeta = '<meta name="viewport" content="width=device-width, initial-scale=1.0">';
+        const viewportMeta = '<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">';
         if(html.includes("<head>")){
-            html = html.replace("<head>", "<head>\n" + viewportMeta);
+            html = html.replace("<head>", "<head>\n" + viewportMeta + "\n" + responsiveStyleInjection);
         } else {
-            html = viewportMeta + "\n" + html;
+            html = viewportMeta + "\n" + responsiveStyleInjection + "\n" + html;
+        }
+    } else {
+        if(html.includes("<head>")){
+            html = html.replace("<head>", "<head>\n" + responsiveStyleInjection);
+        } else {
+            html = responsiveStyleInjection + "\n" + html;
         }
     }
 
@@ -3882,6 +3915,10 @@ window.addEventListener("message", function(event) {
  
     if (event.data.type === 'preview-visual-edit' && event.data.html) { 
         if (!saveVisualEditToExistingFile(event.data.html)) return;
+        if (typeof createVersion === "function") {
+            clearTimeout(versionTimer);
+            versionTimer = setTimeout(createVersion, 500);
+        }
         if (typeof showTopNotification === "function") {
             showTopNotification("💾 Cambios visuales guardados automáticamente", null, 2500);
         }
@@ -3908,9 +3945,13 @@ document.addEventListener("DOMContentLoaded", function() {
             const rect = parentDock.getBoundingClientRect();
             pOffsetX = clientX - rect.left;
             pOffsetY = clientY - rect.top;
+            const currentLeft = rect.left;
+            const currentTop = rect.top;
             parentDock.style.transform = "none";
             parentDock.style.bottom = "auto";
             parentDock.style.right = "auto";
+            parentDock.style.left = currentLeft + "px";
+            parentDock.style.top = currentTop + "px";
         };
 
         let dockRafId = null;
@@ -3919,17 +3960,22 @@ document.addEventListener("DOMContentLoaded", function() {
             if (!draggingParentDock) return;
             if (dockRafId) cancelAnimationFrame(dockRafId);
             dockRafId = requestAnimationFrame(() => {
+                const previewContainer = document.querySelector(".preview-wrapper-container") || document.body;
+                const containerRect = previewContainer.getBoundingClientRect();
+
                 const dockWidth = parentDock.offsetWidth || 300;
                 const dockHeight = parentDock.offsetHeight || 50;
 
-                const maxX = Math.max(10, window.innerWidth - dockWidth - 10);
-                const maxY = Math.max(10, window.innerHeight - dockHeight - 10);
+                const minX = Math.max(10, containerRect.left + 5);
+                const minY = Math.max(10, containerRect.top + 5);
+                const maxX = Math.min(window.innerWidth - dockWidth - 10, containerRect.right - dockWidth - 5);
+                const maxY = Math.min(window.innerHeight - dockHeight - 10, containerRect.bottom - dockHeight - 5);
 
                 let rawX = clientX - pOffsetX;
                 let rawY = clientY - pOffsetY;
 
-                let clampedX = Math.max(10, Math.min(rawX, maxX));
-                let clampedY = Math.max(10, Math.min(rawY, maxY));
+                let clampedX = Math.max(minX, Math.min(rawX, Math.max(minX, maxX)));
+                let clampedY = Math.max(minY, Math.min(rawY, Math.max(minY, maxY)));
 
                 parentDock.style.left = clampedX + "px";
                 parentDock.style.top = clampedY + "px";
@@ -6904,7 +6950,7 @@ codeEditor.addEventListener(
         }, saveDelay);  
   
         clearTimeout(versionTimer);
-        versionTimer = setTimeout(createVersion, 1500);
+        versionTimer = setTimeout(createVersion, 500);
 
         updatePreview();  
     }  
@@ -7888,7 +7934,12 @@ function restoreVersion(id){
   
             saveProjects();  
             currentFileName = null;  
+            const previewFrame = document.getElementById("previewFrame");
+            if (previewFrame) previewFrame.__lastHtml = null;
             loadProject();  
+            if (typeof updatePreviewImmediate === "function") {
+                updatePreviewImmediate();
+            }
         } 
     }); 
 }  
