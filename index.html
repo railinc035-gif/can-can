@@ -1683,6 +1683,31 @@ button:not(.miwy-tb-btn):not(.new-file-button):not(.miwy-create-project):not(.cr
     user-select: none;
     max-width: calc(100vw - 32px);
     overflow-x: auto;
+    transition: border-radius 0.15s ease, border-color 0.15s ease;
+}
+
+.miwy-floating-dock.dock-welded-top {
+    border-top-left-radius: 0 !important;
+    border-top-right-radius: 0 !important;
+    border-top: none !important;
+}
+
+.miwy-floating-dock.dock-welded-bottom {
+    border-bottom-left-radius: 0 !important;
+    border-bottom-right-radius: 0 !important;
+    border-bottom: none !important;
+}
+
+.miwy-floating-dock.dock-welded-left {
+    border-top-left-radius: 0 !important;
+    border-bottom-left-radius: 0 !important;
+    border-left: none !important;
+}
+
+.miwy-floating-dock.dock-welded-right {
+    border-top-right-radius: 0 !important;
+    border-bottom-right-radius: 0 !important;
+    border-right: none !important;
 }
 
 .miwy-floating-dock.dock-fixed-top {
@@ -2835,7 +2860,7 @@ function restoreDockPosition() {
     const parentDock = document.getElementById("parentVisualDock");
     if (!parentDock) return;
 
-    parentDock.classList.remove("dock-fixed-top");
+    parentDock.classList.remove("dock-fixed-top", "dock-welded-top", "dock-welded-bottom", "dock-welded-left", "dock-welded-right");
     parentDock.style.left = "50%";
     parentDock.style.top = "auto";
     parentDock.style.bottom = "20px";
@@ -3902,14 +3927,51 @@ document.addEventListener("DOMContentLoaded", function() {
                 const dockWidth = parentDock.offsetWidth || 300;
                 const dockHeight = parentDock.offsetHeight || 50;
 
-                const maxX = Math.max(10, window.innerWidth - dockWidth - 10);
-                const maxY = Math.max(10, window.innerHeight - dockHeight - 10);
-
                 let rawX = clientX - pOffsetX;
                 let rawY = clientY - pOffsetY;
 
-                let clampedX = Math.max(10, Math.min(rawX, maxX));
-                let clampedY = Math.max(10, Math.min(rawY, maxY));
+                const threshold = 20;
+                const maxRawX = window.innerWidth - dockWidth;
+                const maxRawY = window.innerHeight - dockHeight;
+
+                let isTop = rawY <= threshold;
+                let isBottom = rawY >= maxRawY - threshold;
+                let isLeft = rawX <= threshold;
+                let isRight = rawX >= maxRawX - threshold;
+
+                let finalX = rawX;
+                let finalY = rawY;
+
+                if (isTop) {
+                    finalY = 0;
+                    parentDock.classList.add("dock-welded-top");
+                } else {
+                    parentDock.classList.remove("dock-welded-top");
+                }
+
+                if (isBottom) {
+                    finalY = maxRawY;
+                    parentDock.classList.add("dock-welded-bottom");
+                } else {
+                    parentDock.classList.remove("dock-welded-bottom");
+                }
+
+                if (isLeft) {
+                    finalX = 0;
+                    parentDock.classList.add("dock-welded-left");
+                } else {
+                    parentDock.classList.remove("dock-welded-left");
+                }
+
+                if (isRight) {
+                    finalX = maxRawX;
+                    parentDock.classList.add("dock-welded-right");
+                } else {
+                    parentDock.classList.remove("dock-welded-right");
+                }
+
+                let clampedX = Math.max(0, Math.min(finalX, window.innerWidth - dockWidth));
+                let clampedY = Math.max(0, Math.min(finalY, window.innerHeight - dockHeight));
 
                 parentDock.style.left = clampedX + "px";
                 parentDock.style.top = clampedY + "px";
