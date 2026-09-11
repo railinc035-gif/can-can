@@ -2856,15 +2856,35 @@ function restoreDockPosition() {
     if (!parentDock) return;
 
     parentDock.classList.remove("dock-fixed-top");
-    parentDock.style.left = "50%";
-    parentDock.style.top = "auto";
-    parentDock.style.bottom = "20px";
-    parentDock.style.right = "auto";
-    parentDock.style.transform = "translateX(-50%)";
+
+    if (!savedDockPosition) {
+        try {
+            const raw = localStorage.getItem("miwy_dock_pos");
+            if (raw) savedDockPosition = JSON.parse(raw);
+        } catch (e) { /* ignore */ }
+    }
+
+    if (savedDockPosition && typeof savedDockPosition.x === "number" && typeof savedDockPosition.y === "number") {
+        parentDock.style.transform = "none";
+        parentDock.style.bottom = "auto";
+        parentDock.style.right = "auto";
+        parentDock.style.left = Math.max(10, Math.min(savedDockPosition.x, window.innerWidth - 100)) + "px";
+        parentDock.style.top = Math.max(10, Math.min(savedDockPosition.y, window.innerHeight - 50)) + "px";
+    } else {
+        parentDock.style.left = "50%";
+        parentDock.style.top = "auto";
+        parentDock.style.bottom = "20px";
+        parentDock.style.right = "auto";
+        parentDock.style.transform = "translateX(-50%)";
+    }
+}
+
+function resetDockPosition() {
     savedDockPosition = null;
     try {
         localStorage.removeItem("miwy_dock_pos");
     } catch (e) { /* ignore */ }
+    restoreDockPosition();
 }
 
 let previewDeviceMode = "desktop";
@@ -4742,8 +4762,14 @@ body.theme-claro .file-tree, body.theme-claro .editor-container {
                     onclick="toggleRecursosPlusMenu(event)">+</button>
                 
                 <div id="recursosPlusDropdown" style="display:none; position:absolute; top:32px; left:80px; z-index:1000; background:#10151c; border:1px solid #2b3a48; border-radius:8px; box-shadow:0 10px 25px rgba(0,0,0,0.5); padding:4px 0; min-width:140px;">
-                    <button onclick="openCreateFilePrompt(); toggleRecursosPlusMenu();" style="width:100%; padding:8px 12px; background:transparent; border:none; color:#edf2f7; text-align:left; font-size:11px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:6px;">📄 Crear archivo</button>
-                    <button onclick="createNewFolderPrompt(); toggleRecursosPlusMenu();" style="width:100%; padding:8px 12px; background:transparent; border:none; color:#edf2f7; text-align:left; font-size:11px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:6px;">📁 Crear carpeta</button>
+                    <button onclick="openCreateFilePrompt(); toggleRecursosPlusMenu();" style="width:100%; padding:8px 12px; background:transparent; border:none; color:#edf2f7; text-align:left; font-size:11px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:8px;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--orange)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="18" x2="12" y2="12"></line><line x1="9" y1="15" x2="15" y2="15"></line></svg>
+                        Crear archivo
+                    </button>
+                    <button onclick="createNewFolderPrompt(); toggleRecursosPlusMenu();" style="width:100%; padding:8px 12px; background:transparent; border:none; color:#edf2f7; text-align:left; font-size:11px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:8px;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--orange)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path><line x1="12" y1="11" x2="12" y2="17"></line><line x1="9" y1="14" x2="15" y2="14"></line></svg>
+                        Crear carpeta
+                    </button>
                 </div>
             </div>
 
