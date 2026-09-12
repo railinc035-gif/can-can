@@ -1683,6 +1683,31 @@ button:not(.miwy-tb-btn):not(.new-file-button):not(.miwy-create-project):not(.cr
     user-select: none;
     max-width: calc(100vw - 32px);
     overflow-x: auto;
+    transition: border-radius 0.15s ease, border-color 0.15s ease;
+}
+
+.miwy-floating-dock.dock-welded-top {
+    border-top-left-radius: 0 !important;
+    border-top-right-radius: 0 !important;
+    border-top: none !important;
+}
+
+.miwy-floating-dock.dock-welded-bottom {
+    border-bottom-left-radius: 0 !important;
+    border-bottom-right-radius: 0 !important;
+    border-bottom: none !important;
+}
+
+.miwy-floating-dock.dock-welded-left {
+    border-top-left-radius: 0 !important;
+    border-bottom-left-radius: 0 !important;
+    border-left: none !important;
+}
+
+.miwy-floating-dock.dock-welded-right {
+    border-top-right-radius: 0 !important;
+    border-bottom-right-radius: 0 !important;
+    border-right: none !important;
 }
 
 .miwy-floating-dock.dock-fixed-top {
@@ -2772,6 +2797,23 @@ function saveVisualEditToExistingFile(updatedHtml) {
     const project = typeof getCurrentProject === "function" ? getCurrentProject() : null;
     if (!project || !updatedHtml) return false;
 
+    // Static syntax validation via DOMParser before persisting visual changes
+    try {
+        const parser = new DOMParser();
+        const parsedDoc = parser.parseFromString(updatedHtml, "text/html");
+        const parserErrors = parsedDoc.querySelectorAll("parsererror");
+        if (parserErrors && parserErrors.length > 0) {
+            console.warn("Validación sintáctica fallida en edición visual. Revertiendo cambios:", parserErrors[0].textContent);
+            if (typeof showTopNotification === "function") {
+                showTopNotification("⚠️ Sintaxis inválida detectada en edición visual; cambio revertido automáticamente.", null, 3000);
+            }
+            return false;
+        }
+    } catch (err) {
+        console.warn("Error en validador sintáctico del editor visual:", err);
+        return false;
+    }
+
     const htmlFile = Object.keys(project.files || {}).find(filename => {
         return typeof getFileType === "function" && getFileType(filename) === "html";
     });
@@ -2835,7 +2877,7 @@ function restoreDockPosition() {
     const parentDock = document.getElementById("parentVisualDock");
     if (!parentDock) return;
 
-    parentDock.classList.remove("dock-fixed-top");
+    parentDock.classList.remove("dock-fixed-top", "dock-welded-top", "dock-welded-bottom", "dock-welded-left", "dock-welded-right");
     parentDock.style.left = "50%";
     parentDock.style.top = "auto";
     parentDock.style.bottom = "20px";
@@ -3066,7 +3108,7 @@ body.theme-claro .file-tree, body.theme-claro .editor-container {
       };
       console.error = function(...args) {
         origError(...args);
-        out.textContent += "❌ [Error] " + args.join(" ") + "\\n";
+        out.textContent += "⚠️ [Error] " + args.join(" ") + "\\n";
       };
       console.warn = function(...args) {
         origWarn(...args);
@@ -3078,7 +3120,7 @@ body.theme-claro .file-tree, body.theme-claro .editor-container {
           out.textContent += "\\n[Retorno]: " + String(result) + "\\n";
         }
       } catch (err) {
-        out.textContent += "\\n❌ Error en tiempo de ejecución:\\n" + err.stack;
+        out.textContent += "\\n⚠️ Error en tiempo de ejecución:\\n" + err.stack;
       }
     })();
   <\/script>
@@ -3323,7 +3365,7 @@ body.theme-claro .file-tree, body.theme-claro .editor-container {
 </head>  
 <body>  
     <div class="card">
-        <h1>🚀 Tu app o web se reflejará aquí</h1>
+        <h1> Tu app o web se reflejará aquí</h1>
         <p>Crea o edita tus archivos en cualquier lenguaje para ver la ejecución en tiempo real.</p>
     </div>
 </body>  
@@ -3661,19 +3703,31 @@ body.theme-claro .file-tree, body.theme-claro .editor-container {
             var handleResizeStart = function(clientX, clientY) {
                 var startX = clientX, startY = clientY;
                 var startW = selectedTarget.offsetWidth, startH = selectedTarget.offsetHeight;
+                var latestResizeX = clientX, latestResizeY = clientY;
+                var isResizing = true;
                 var rafId = null;
 
+                var updateResize = function() {
+                    rafId = null;
+                    if (!isResizing) return;
+                    selectedTarget.style.width = Math.max(20, startW + (latestResizeX - startX)) + 'px';
+                    selectedTarget.style.height = Math.max(20, startH + (latestResizeY - startY)) + 'px';
+                };
+
                 var doResize = function(me) {
-                    if (rafId) cancelAnimationFrame(rafId);
-                    rafId = requestAnimationFrame(function() {
-                        var cx = me.clientX !== undefined ? me.clientX : (me.touches && me.touches[0] ? me.touches[0].clientX : startX);
-                        var cy = me.clientY !== undefined ? me.clientY : (me.touches && me.touches[0] ? me.touches[0].clientY : startY);
-                        selectedTarget.style.width = Math.max(20, startW + (cx - startX)) + 'px';
-                        selectedTarget.style.height = Math.max(20, startH + (cy - startY)) + 'px';
-                    });
+                    if (!isResizing) return;
+                    latestResizeX = me.clientX !== undefined ? me.clientX : (me.touches && me.touches[0] ? me.touches[0].clientX : startX);
+                    latestResizeY = me.clientY !== undefined ? me.clientY : (me.touches && me.touches[0] ? me.touches[0].clientY : startY);
+                    if (!rafId) {
+                        rafId = requestAnimationFrame(updateResize);
+                    }
                 };
                 var stopResize = function() {
-                    if (rafId) cancelAnimationFrame(rafId);
+                    isResizing = false;
+                    if (rafId) {
+                        cancelAnimationFrame(rafId);
+                        rafId = null;
+                    }
                     window.removeEventListener('mousemove', doResize);
                     window.removeEventListener('mouseup', stopResize);
                     window.removeEventListener('touchmove', doResize);
@@ -3711,22 +3765,31 @@ body.theme-claro .file-tree, body.theme-claro .editor-container {
                 var startX = clientX, startY = clientY;
                 var startLeft = parseFloat(selectedTarget.style.left) || 0;
                 var startTop = parseFloat(selectedTarget.style.top) || 0;
+                var latestMoveX = clientX, latestMoveY = clientY;
                 var elemRafId = null;
+
+                var updateElemMove = function() {
+                    elemRafId = null;
+                    if (!draggingElem) return;
+                    selectedTarget.style.left = (startLeft + (latestMoveX - startX)) + 'px';
+                    selectedTarget.style.top = (startTop + (latestMoveY - startY)) + 'px';
+                };
 
                 var doElemMove = function(me) {
                     if (!draggingElem) return;
-                    if (elemRafId) cancelAnimationFrame(elemRafId);
-                    elemRafId = requestAnimationFrame(function() {
-                        var cx = me.clientX !== undefined ? me.clientX : (me.touches && me.touches[0] ? me.touches[0].clientX : startX);
-                        var cy = me.clientY !== undefined ? me.clientY : (me.touches && me.touches[0] ? me.touches[0].clientY : startY);
-                        selectedTarget.style.left = (startLeft + (cx - startX)) + 'px';
-                        selectedTarget.style.top = (startTop + (cy - startY)) + 'px';
-                    });
+                    latestMoveX = me.clientX !== undefined ? me.clientX : (me.touches && me.touches[0] ? me.touches[0].clientX : startX);
+                    latestMoveY = me.clientY !== undefined ? me.clientY : (me.touches && me.touches[0] ? me.touches[0].clientY : startY);
+                    if (!elemRafId) {
+                        elemRafId = requestAnimationFrame(updateElemMove);
+                    }
                 };
 
                 var stopElemMove = function() {
                     draggingElem = false;
-                    if (elemRafId) cancelAnimationFrame(elemRafId);
+                    if (elemRafId) {
+                        cancelAnimationFrame(elemRafId);
+                        elemRafId = null;
+                    }
                     window.removeEventListener('mousemove', doElemMove);
                     window.removeEventListener('mouseup', stopElemMove);
                     window.removeEventListener('touchmove', doElemMove);
@@ -3863,7 +3926,7 @@ window.addEventListener("message", function(event) {
     if (event.data.type === 'preview-visual-edit' && event.data.html) { 
         if (!saveVisualEditToExistingFile(event.data.html)) return;
         if (typeof showTopNotification === "function") {
-            showTopNotification("💾 Cambios visuales guardados automáticamente", null, 2500);
+            showTopNotification(" Cambios visuales guardados automáticamente", null, 2500);
         }
         return; 
     } 
@@ -3882,51 +3945,113 @@ document.addEventListener("DOMContentLoaded", function() {
     if (parentDock && parentHandle) {
         let draggingParentDock = false;
         let pOffsetX = 0, pOffsetY = 0;
+        let latestX = 0, latestY = 0;
+        let dockRafId = null;
 
         var startDockDrag = function(clientX, clientY) {
             draggingParentDock = true;
+            latestX = clientX;
+            latestY = clientY;
             const rect = parentDock.getBoundingClientRect();
             pOffsetX = clientX - rect.left;
             pOffsetY = clientY - rect.top;
             parentDock.style.transform = "none";
             parentDock.style.bottom = "auto";
             parentDock.style.right = "auto";
+            parentDock.style.willChange = "left, top";
         };
 
-        let dockRafId = null;
+        var updateDockPosition = function() {
+            dockRafId = null;
+            if (!draggingParentDock) return;
+
+            const dockWidth = parentDock.offsetWidth || 300;
+            const dockHeight = parentDock.offsetHeight || 50;
+
+            let rawX = latestX - pOffsetX;
+            let rawY = latestY - pOffsetY;
+
+            const threshold = 20;
+            const maxRawX = window.innerWidth - dockWidth;
+            const maxRawY = window.innerHeight - dockHeight;
+
+            let isTop = rawY <= threshold;
+            let isBottom = rawY >= maxRawY - threshold;
+            let isLeft = rawX <= threshold;
+            let isRight = rawX >= maxRawX - threshold;
+
+            let finalX = rawX;
+            let finalY = rawY;
+
+            if (isTop) {
+                finalY = 0;
+                parentDock.classList.add("dock-welded-top");
+            } else {
+                parentDock.classList.remove("dock-welded-top");
+            }
+
+            if (isBottom) {
+                finalY = maxRawY;
+                parentDock.classList.add("dock-welded-bottom");
+            } else {
+                parentDock.classList.remove("dock-welded-bottom");
+            }
+
+            if (isLeft) {
+                finalX = 0;
+                parentDock.classList.add("dock-welded-left");
+            } else {
+                parentDock.classList.remove("dock-welded-left");
+            }
+
+            if (isRight) {
+                finalX = maxRawX;
+                parentDock.classList.add("dock-welded-right");
+            } else {
+                parentDock.classList.remove("dock-welded-right");
+            }
+
+            let clampedX = Math.max(0, Math.min(finalX, window.innerWidth - dockWidth));
+            let clampedY = Math.max(0, Math.min(finalY, window.innerHeight - dockHeight));
+
+            parentDock.style.left = clampedX + "px";
+            parentDock.style.top = clampedY + "px";
+
+            savedDockPosition = { x: clampedX, y: clampedY };
+        };
 
         var moveDockDrag = function(clientX, clientY) {
             if (!draggingParentDock) return;
-            if (dockRafId) cancelAnimationFrame(dockRafId);
-            dockRafId = requestAnimationFrame(() => {
-                const dockWidth = parentDock.offsetWidth || 300;
-                const dockHeight = parentDock.offsetHeight || 50;
-
-                const maxX = Math.max(10, window.innerWidth - dockWidth - 10);
-                const maxY = Math.max(10, window.innerHeight - dockHeight - 10);
-
-                let rawX = clientX - pOffsetX;
-                let rawY = clientY - pOffsetY;
-
-                let clampedX = Math.max(10, Math.min(rawX, maxX));
-                let clampedY = Math.max(10, Math.min(rawY, maxY));
-
-                parentDock.style.left = clampedX + "px";
-                parentDock.style.top = clampedY + "px";
-
-                savedDockPosition = { x: clampedX, y: clampedY };
-            });
+            latestX = clientX;
+            latestY = clientY;
+            if (!dockRafId) {
+                dockRafId = requestAnimationFrame(updateDockPosition);
+            }
         };
 
         var endDockDrag = function() {
             draggingParentDock = false;
-            if (dockRafId) cancelAnimationFrame(dockRafId);
+            if (dockRafId) {
+                cancelAnimationFrame(dockRafId);
+                dockRafId = null;
+            }
+            parentDock.style.willChange = "auto";
             if (savedDockPosition) {
                 try {
                     localStorage.setItem("miwy_dock_pos", JSON.stringify(savedDockPosition));
                 } catch (err) { /* ignore */ }
             }
         };
+
+        // Prevent default dblclick jumping / teleportation
+        parentHandle.addEventListener("dblclick", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+        });
+        parentDock.addEventListener("dblclick", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+        });
 
         // Mouse events
         parentHandle.addEventListener("mousedown", (e) => {
@@ -4194,7 +4319,7 @@ function refactorAllProjectFiles() {
     if (typeof saveProjects === "function") saveProjects();
     if (typeof updatePreview === "function") updatePreview();
 
-    showTopNotification(`✨ Refactorizados ${count} archivo(s) en todo el proyecto`, null, 3000);
+    showTopNotification(` Refactorizados ${count} archivo(s) en todo el proyecto`, null, 3000);
 }
 
 function formatCurrentCode() {
@@ -4202,7 +4327,7 @@ function formatCurrentCode() {
     if (!editor || editor.disabled || !editor.value.trim()) return;
 
     if (editor.value.length > LARGE_FILE_THRESHOLD) {
-        showTopNotification("⚡ Archivo grande: la refactorización se omitió para mantener el editor rápido", null, 3500);
+        showTopNotification(" Archivo grande: la refactorización se omitió para mantener el editor rápido", null, 3500);
         return;
     }
 
@@ -4217,7 +4342,7 @@ function formatCurrentCode() {
     if (typeof updatePreview === "function") updatePreview();
 
     if (typeof showTopNotification === "function") {
-        showTopNotification("✨ Código refactorizado correctamente", null, 2500);
+        showTopNotification(" Código refactorizado correctamente", null, 2500);
     }
 }
 
@@ -4300,7 +4425,7 @@ function performCodeSearch() {
             searchMatches = [];
             currentMatchIndex = -1;
             countEl.textContent = "Archivo grande";
-            showTopNotification("⚡ La búsqueda completa está desactivada en archivos grandes para evitar bloqueos", null, 3000);
+            showTopNotification(" La búsqueda completa está desactivada en archivos grandes para evitar bloqueos", null, 3000);
             return;
         }
 
@@ -4598,8 +4723,8 @@ body.theme-claro .file-tree, body.theme-claro .editor-container {
                     onclick="toggleRecursosPlusMenu(event)">+</button>
                 
                 <div id="recursosPlusDropdown" style="display:none; position:absolute; top:32px; left:80px; z-index:1000; background:#10151c; border:1px solid #2b3a48; border-radius:8px; box-shadow:0 10px 25px rgba(0,0,0,0.5); padding:4px 0; min-width:140px;">
-                    <button onclick="openCreateFilePrompt(); toggleRecursosPlusMenu();" style="width:100%; padding:8px 12px; background:transparent; border:none; color:#edf2f7; text-align:left; font-size:11px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:6px;">📄 Crear archivo</button>
-                    <button onclick="createNewFolderPrompt(); toggleRecursosPlusMenu();" style="width:100%; padding:8px 12px; background:transparent; border:none; color:#edf2f7; text-align:left; font-size:11px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:6px;">📁 Crear carpeta</button>
+                    <button onclick="openCreateFilePrompt(); toggleRecursosPlusMenu();" style="width:100%; padding:8px 12px; background:transparent; border:none; color:#edf2f7; text-align:left; font-size:11px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:8px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--orange)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a1 1 0 0 0 1 1h4"/><path d="M9 15h6"/><path d="M12 12v6"/></svg><span>Crear archivo</span></button>
+                    <button onclick="createNewFolderPrompt(); toggleRecursosPlusMenu();" style="width:100%; padding:8px 12px; background:transparent; border:none; color:#edf2f7; text-align:left; font-size:11px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:8px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--orange)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L8.6 3.3A2 2 0 0 0 6.9 2.5H4a2 2 0 0 0-2 2v13.5a2 2 0 0 0 2 2Z"/><path d="M12 10v6"/><path d="M9 13h6"/></svg><span>Crear carpeta</span></button>
                 </div>
             </div>
 
@@ -4632,7 +4757,7 @@ body.theme-claro .file-tree, body.theme-claro .editor-container {
         </div>
 
         <div id="folderBreadcrumb" style="font-size:11px; color:#91a0ad; margin-bottom:10px; display:flex; align-items:center; gap:6px;">
-            <span style="color:var(--orange); cursor:pointer;" onclick="renderFolderManager('/')">📁 Inicio</span>
+            <span style="color:var(--orange); cursor:pointer;" onclick="renderFolderManager('/')"> °-° Inicio</span>
         </div>
 
         <div id="folderGrid" style="flex:1; overflow-y:auto; display:grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap:10px; align-content:start; padding:4px; border:2px dashed transparent; border-radius:8px; transition:all 0.2s;">
@@ -4640,7 +4765,7 @@ body.theme-claro .file-tree, body.theme-claro .editor-container {
         </div>
 
         <div style="font-size:10px; color:#627382; padding-top:8px; border-top:1px solid #1a232c; text-align:center;">
-            ⚡ Arrastra y suelta archivos aquí para organizarlos automáticamente por tipo en tu proyecto.
+             Arrastra y suelta archivos aquí para organizarlos automáticamente por tipo en tu proyecto.
         </div>
 
         <!-- CODE EDITOR FLOATING MODAL DIALOG (OPENS ONLY ON 'EDITAR') -->
@@ -4698,8 +4823,8 @@ body.theme-claro .file-tree, body.theme-claro .editor-container {
                     <div class="code-footer" style="justify-content:space-between;">  
                         <span id="fileFooterName" style="display:none;">Sin archivo</span>  
                         <div style="display:flex; align-items:center; gap:6px;">
-                            <button id="copyCodeBtn" class="preview-button" style="height:22px; padding:0 8px; font-size:10px; color:#aaa; gap:4px;" title="Copiar código al portapapeles">📋 Copiar</button>
-                            <button id="pasteCodeBtn" class="preview-button" style="height:22px; padding:0 8px; font-size:10px; color:#aaa; gap:4px;" title="Pegar del portapapeles">📋 Pegar</button>
+                            <button id="copyCodeBtn" class="preview-button" style="height:22px; padding:0 8px; font-size:10px; color:#aaa; gap:4px;" title="Copiar código al portapapeles"> Copiar</button>
+                            <button id="pasteCodeBtn" class="preview-button" style="height:22px; padding:0 8px; font-size:10px; color:#aaa; gap:4px;" title="Pegar del portapapeles"> Pegar</button>
                         </div>
                         <div style="display:flex; align-items:center; gap:10px;">
                             <span id="lineCounter" style="color:#42d66b !important; font-weight:700; font-size:11px;">0 Líneas</span>  
@@ -4797,7 +4922,7 @@ body.theme-claro .file-tree, body.theme-claro .editor-container {
 <div id="diffOverlay" class="overlay"> 
     <div class="dialog" style="width: 750px; max-width: calc(100vw - 20px);"> 
         <div class="dialog-title" style="display: flex; justify-content: space-between; align-items: center;"> 
-            <span>👀 Revisión de cambios de Miwy</span> 
+            <span> Revisión de cambios de Miwy</span> 
             <span id="diffFileName" style="font-size: 11px; font-weight: normal; background: #222; padding: 4px 8px; border-radius: 4px; color: var(--orange);"></span> 
         </div> 
         <div class="dialog-description"> 
@@ -4817,10 +4942,10 @@ body.theme-claro .file-tree, body.theme-claro .editor-container {
  
         <div class="dialog-buttons"> 
             <button id="rejectDiffBtn" class="dialog-cancel" style="background: #251010; color: var(--danger);"> 
-                ❌ Rechazar cambios 
+                 Rechazar cambios 
             </button> 
             <button id="acceptDiffBtn" class="dialog-confirm" style="background: #112d19; color: var(--green); border: 1px solid #235d34;"> 
-                ✅ Aceptar cambios 
+                 Aceptar cambios 
             </button> 
         </div> 
     </div> 
